@@ -17,7 +17,16 @@ Demo recording: [Demo/PuzzleMagic_Demo.mp4](Demo/PuzzleMagic_Demo.mp4)
 - Windows 10 or 11 and a DirectX 12 GPU with hardware ray tracing (developed on an AMD Radeon RX 6400, 4 GB).
 - Unreal Engine 5.8. The `.bat` launchers expect it in `C:\Program Files\Epic Games\UE_5.8`.
 - Visual Studio 2022 or its Build Tools with the C++ game development workload (built with MSVC 14.44).
-- [Git LFS](https://git-lfs.com): assets, audio, textures and prebuilt libraries are stored in LFS. Run `git lfs install` once before cloning.
+- [Git LFS](https://git-lfs.com): assets, audio, textures and prebuilt libraries are stored in LFS.
+
+## Get the code
+
+```bat
+git lfs install
+git clone https://github.com/ValhalaStudio/PuzzleMagic.git "D:\Unreal Projects\PuzzleMagic"
+```
+
+Clone into a short folder like that one. Some files in the FSR plugin have 174-character paths, and Windows limits full paths to 260 characters, so a deeply nested clone fails to check out unless you first run `git config --global core.longpaths true`.
 
 ## Build and run
 
