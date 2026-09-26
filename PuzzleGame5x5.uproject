@@ -1,0 +1,38 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "Cartoon-fantasy 9x9 block puzzle (drag pieces, clear rows/columns/3x3 boxes) targeting iOS, with an auto-play demo mode.",
+	"Modules": [
+		{
+			"Name": "PuzzleGame5x5",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "PythonScriptPlugin",
+			"Enabled": true
+		},
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
+		},
+		{
+			"Name": "RealtimeMeshComponent",
+			"Enabled": true
+		},
+		{
+			"Name": "FSR",
+			"Enabled": true,
+			"PlatformAllowList": [
+				"Win64"
+			]
+		}
+	],
+	"TargetPlatforms": [
+		"Windows",
+		"IOS"
+	]
+}

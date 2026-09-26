@@ -1,0 +1,28 @@
+# Build output, caches and per-user state: Unreal Engine regenerates all of these.
+/Binaries/
+/Intermediate/
+/Saved/
+/DerivedDataCache/
+/Plugins/*/Binaries/
+/Plugins/*/Intermediate/
+
+# IDE and generated project files
+.vs/
+.vscode/
+.idea/
+*.sln
+*.suo
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+
+# Debug symbols: not needed to build or run
+*.pdb
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# RunDemo.bat's screen capture lands in the project folder
+/DemoCapture.mp4
