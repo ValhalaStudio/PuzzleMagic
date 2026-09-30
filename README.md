@@ -28,7 +28,7 @@ Every tile carries a triangle that points up, right, down or left. Pieces come t
 
 ```bat
 git lfs install
-git clone https://github.com/ValhalaStudio/PuzzleMagic.git "D:\Unreal Projects\PuzzleMagic"
+git clone https://github.com/areklis/PuzzleMagic.git "D:\Unreal Projects\PuzzleMagic"
 ```
 
 ## Build and run
