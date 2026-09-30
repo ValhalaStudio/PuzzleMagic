@@ -19,7 +19,6 @@ UENUM(BlueprintType)
 enum class EPuzzleFlow : uint8
 {
 	Menu,
-	LevelIntro,
 	Playing,
 	Finished
 };
@@ -52,25 +51,31 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	TObjectPtr<UPuzzleSaveGame> SaveGame;
 
-	// --- Flow: menu -> (level intro) -> playing -> finished card ---
+	// --- Flow: menu -> playing -> finished card ---
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void ShowMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void StartEndless();
 
-	// Sets up quest level N and shows its intro card.
-	UFUNCTION(BlueprintCallable, Category = "Puzzle")
-	void SelectLevel(int32 Level);
-
-	UFUNCTION(BlueprintCallable, Category = "Puzzle")
-	void BeginLevel();
-
-	UFUNCTION(BlueprintCallable, Category = "Puzzle")
-	void NextLevel();
-
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void Retry();
+
+	// The menu that opens with P (or the MENU button) while playing: Take over / Resume and Main menu.
+	void OpenPauseMenu();
+	void ClosePauseMenu();
+	void TogglePauseMenu();
+	// Leaves demo mode and lets the player play the round that is on the board.
+	void TakeOver();
+	// Starts a fresh round with the bot playing.
+	void StartDemo();
+	// Picks the board size (each side 4 to 8), saves it and clears the board.
+	void SetCourse(int32 Width, int32 Height);
+	// The play options. Relics means combo, relics and luck together.
+	void SetOptions(bool bRelics, bool bBonusTiles);
+
+	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
+	bool bPauseMenuOpen = false;
 
 	// Relic buttons: Reroll fires at once, Holy Light arms tap-to-target.
 	void RequestRelic(ERelic Relic);
@@ -81,14 +86,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	EPuzzleFlow Flow = EPuzzleFlow::Menu;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
-	EPlayMode Mode = EPlayMode::Endless;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
-	int32 CurrentLevel = 1;
-
 	// Result of the last finished round, for the end card.
-	int32 LastStars = 0;
 	bool bLastNewBest = false;
 
 	// --- Auto-play / demo mode: the bot plays itself on a fixed cadence ---
@@ -123,28 +121,13 @@ public:
 	TObjectPtr<USoundBase> GameOverSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
-	TObjectPtr<USoundBase> BlessedSound;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	TObjectPtr<USoundBase> HolySound;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
-	TObjectPtr<USoundBase> GargoyleSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	TObjectPtr<USoundBase> RelicSound;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	TObjectPtr<USoundBase> ComboLostSound;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
-	TObjectPtr<USoundBase> StrikeSound;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
-	TObjectPtr<USoundBase> HexSound;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
-	TObjectPtr<USoundBase> WardSound;
 
 	// Soundtrack playlist: Gregorian chant (played twice), then the organ piece, crossfaded.
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
@@ -168,14 +151,13 @@ protected:
 	void HandleCleared(const FPuzzleClearEvent& Event);
 	void HandleComboBroken(int32 LostCombo);
 	void HandleRelicGained(ERelic Relic);
-	void HandleStoneSpawned(FIntPoint Cell);
-	void HandleOmen(EOmen Omen, bool bWarded, FIntPoint Cell);
-	void HandleFinished(bool bWon);
+	void HandleBonusSpawned(FIntPoint Cell);
+	void HandleFinished();
 
+	void ReframeCamera();
 	void PlayNextTrack();
 
 	void StartRound();
-	void PlayCelebration();
 	void Later(float Delay, TFunction<void()> Callback);
 
 	void BotTick();

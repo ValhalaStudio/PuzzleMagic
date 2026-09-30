@@ -6,33 +6,25 @@ void UPuzzleManager::BindToGrid(AGridManager* InGridManager)
 	GridManager = InGridManager;
 }
 
-void UPuzzleManager::StartGame(EPlayMode InMode, const FQuestLevel& Level)
+void UPuzzleManager::StartGame()
 {
-	Mode = InMode;
-	Quest = Level;
 	Score = 0;
 	ComboStreak = 0;
 	ComboWindow = 0;
 	LastRoundScore = 0;
-	StartingMoves = Mode == EPlayMode::Quest ? Level.Moves : EndlessStartingMoves;
+	StartingMoves = StartingMovesCount;
 	MovesLeft = StartingMoves;
 	MovesMade = 0;
 	LastBonusMoves = 0;
 	// One of each to start, so the relic buttons are learnable from the first move.
-	RelicCharges[0] = 1;
-	RelicCharges[1] = 1;
+	RelicCharges[0] = bRelicsEnabled ? 1 : 0;
+	RelicCharges[1] = bRelicsEnabled ? 1 : 0;
 	NextRelicCombo = RelicComboStep;
 	NextRelic = ERelic::HolyLight;
-	QuestProgress = 0;
 	bFinished = false;
-	bWon = false;
 	Luck = StartingLuck;
-	MovesSinceOmen = 0;
-}
-
-int32 UPuzzleManager::StoneInterval() const
-{
-	return Mode == EPlayMode::Quest ? Quest.StoneInterval : EndlessStoneInterval;
+	NextBasicBonusScore = BasicBonusEvery;
+	NextPairBonusScore = PairBonusEvery;
 }
 
 bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
@@ -51,38 +43,46 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 	OnPiecePlaced.Broadcast();
 
 	// The board state clears now; the visual pop waits for the piece to land.
-	const FClearResult Result = GridManager->CheckAndClearLines(AGridManager::ArriveDuration);
+	FClearResult Result = GridManager->CheckAndClearLines(AGridManager::ArriveDuration);
 
-	--MovesLeft;
+	if (bMoveBudgetEnabled)
+	{
+		--MovesLeft;
+	}
 	++MovesMade;
 
-	int32 RoundScore = Shape.Cells.Num();
+	// Placing a piece scores nothing; only clears do.
+	int32 RoundScore = 0;
 	LastBonusMoves = 0;
 	if (Result.Lines > 0)
 	{
 		// Multi-line clears push the combo up faster; any clear refills the window.
-		ComboStreak += Result.Lines;
-		ComboWindow = ComboWindowMoves;
-
-		int32 ClearPoints = (Result.Cells * 2 + Result.Lines * 15 + Result.Blessings * 50 + Result.StonesBroken * 25) * ComboStreak;
-		if (Result.bBlessedBox)
+		if (bComboEnabled)
 		{
-			ClearPoints *= 3;
+			ComboStreak += Result.Lines;
+			ComboWindow = ComboWindowMoves;
 		}
-		RoundScore += ClearPoints;
 
-		int32 Bonus = Result.Lines + 2 * Result.Blessings + (ComboStreak >= 3 ? 1 : 0) + (ComboStreak >= 6 ? 1 : 0) + (Result.bBlessedBox ? 1 : 0);
-		// Quests are tighter: a plain single clear doesn't refund its own move.
-		if (Mode == EPlayMode::Quest)
+		const int32 Multiplier = bComboEnabled ? ComboStreak : 1;
+		int32 ClearPoints = Result.Cells * 2 + Result.Lines * 15;
+		for (const FRouteInfo& Route : Result.Routes)
 		{
-			Bonus -= 1;
+			ClearPoints += RouteBonus(Route);
 		}
-		LastBonusMoves = FMath::Max(Bonus, 0);
-		MovesLeft += LastBonusMoves;
+		RoundScore += ClearPoints * Multiplier;
+
+		if (bMoveBudgetEnabled)
+		{
+			LastBonusMoves = Result.Lines + (ComboStreak >= 3 ? 1 : 0) + (ComboStreak >= 6 ? 1 : 0);
+			MovesLeft += LastBonusMoves;
+		}
 		AddLuck(LuckPerComboStep * Result.Lines);
-		GrantRelics();
+		if (bRelicsEnabled)
+		{
+			GrantRelics();
+		}
 	}
-	else if (ComboStreak > 0 && --ComboWindow <= 0)
+	else if (bComboEnabled && ComboStreak > 0 && --ComboWindow <= 0)
 	{
 		const int32 Lost = ComboStreak;
 		ComboStreak = 0;
@@ -91,11 +91,17 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 		OnComboBroken.Broadcast(Lost);
 	}
 
+	// Bonus tiles cleared by chains add their own points (never multiplied by the combo).
+	for (FBonusEvent& Bonus : Result.Bonuses)
+	{
+		Bonus.Points = BonusPoints(Bonus);
+		RoundScore += Bonus.Points;
+	}
+
 	Score += RoundScore;
 	LastRoundScore = RoundScore;
-	AddQuestProgress(Result);
 
-	if (Result.Lines > 0)
+	if (Result.Lines > 0 || Result.CircuitCells > 0 || Result.Bonuses.Num() > 0)
 	{
 		FPuzzleClearEvent Event;
 		Event.Result = Result;
@@ -106,26 +112,7 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 		OnCleared.Broadcast(Event);
 	}
 
-	// Gargoyles land after the move resolves, so they never block the piece just played.
-	const int32 Interval = StoneInterval();
-	bool bStoneFell = false;
-	if (Interval > 0 && MovesMade % Interval == 0)
-	{
-		FIntPoint Cell;
-		if (GridManager->SpawnCurseStone(Cell, AGridManager::ArriveDuration + 0.7f))
-		{
-			bStoneFell = true;
-			OnStoneSpawned.Broadcast(Cell);
-		}
-	}
-
-	// One misfortune per move: an omen never lands on the same move as a gargoyle.
-	++MovesSinceOmen;
-	if (!bStoneFell)
-	{
-		RollOmen();
-	}
-
+	SpawnDueBonusTiles();
 	CheckForEnd();
 	return true;
 }
@@ -138,7 +125,7 @@ bool UPuzzleManager::ParkPiece(int32 TraySlot)
 bool UPuzzleManager::UseHolyLight(int32 CenterX, int32 CenterY)
 {
 	int32& Charges = RelicCharges[static_cast<int32>(ERelic::HolyLight)];
-	if (!GridManager || bFinished || Charges <= 0)
+	if (!bRelicsEnabled || !GridManager || bFinished || Charges <= 0)
 	{
 		return false;
 	}
@@ -146,10 +133,9 @@ bool UPuzzleManager::UseHolyLight(int32 CenterX, int32 CenterY)
 	AddLuck(-HolyLightLuckCost);
 
 	const FClearResult Result = GridManager->ClearArea(CenterX, CenterY, 0.05f);
-	const int32 Points = Result.Cells * 3 + Result.StonesBroken * 25;
+	const int32 Points = Result.Cells * 3;
 	Score += Points;
 	LastRoundScore = Points;
-	AddQuestProgress(Result);
 
 	FPuzzleClearEvent Event;
 	Event.Result = Result;
@@ -159,6 +145,7 @@ bool UPuzzleManager::UseHolyLight(int32 CenterX, int32 CenterY)
 	Event.Centroid = GridManager->GetLastClearCentroid();
 	OnCleared.Broadcast(Event);
 
+	SpawnDueBonusTiles();
 	CheckForEnd();
 	return true;
 }
@@ -166,7 +153,7 @@ bool UPuzzleManager::UseHolyLight(int32 CenterX, int32 CenterY)
 bool UPuzzleManager::UseReroll()
 {
 	int32& Charges = RelicCharges[static_cast<int32>(ERelic::Reroll)];
-	if (!GridManager || bFinished || Charges <= 0)
+	if (!bRelicsEnabled || !GridManager || bFinished || Charges <= 0)
 	{
 		return false;
 	}
@@ -177,63 +164,70 @@ bool UPuzzleManager::UseReroll()
 	return true;
 }
 
-void UPuzzleManager::AddLuck(int32 Delta)
+int32 UPuzzleManager::PowerBonus(int32 ExtraTiles, int32 Base)
 {
-	Luck = FMath::Clamp(Luck + Delta, 0, MaxLuck);
+	if (ExtraTiles <= 0)
+	{
+		return 0;
+	}
+	int64 Bonus = 1;
+	for (int32 I = 0; I < ExtraTiles && Bonus < MaxRouteBonus; ++I)
+	{
+		Bonus *= Base;
+	}
+	return static_cast<int32>(FMath::Min<int64>(Bonus, MaxRouteBonus));
 }
 
-float UPuzzleManager::GetOmenChance() const
+int32 UPuzzleManager::RouteBonus(const FRouteInfo& Route)
 {
-	if (OmenChanceOverride >= 0.f)
-	{
-		return OmenChanceOverride;
-	}
-	if (Mode == EPlayMode::Quest)
-	{
-		// The first levels teach the basics in calm weather; the storm arrives with the gargoyles.
-		return Quest.Number < 5 ? 0.f : FMath::Min(0.08f + 0.012f * (Quest.Number - 5), 0.2f);
-	}
-	return MovesMade < 4 ? 0.f : FMath::Min(0.1f + 0.002f * MovesMade, 0.25f);
+	return PowerBonus(Route.ExtraTiles, Route.bNeighbouring ? 5 : 10);
 }
 
-void UPuzzleManager::RollOmen()
+int32 UPuzzleManager::BonusPoints(const FBonusEvent& Event)
 {
-	if (MovesSinceOmen < OmenCooldownMoves || FMath::FRand() >= GetOmenChance())
+	if (Event.bLinked)
+	{
+		return LinkedBonusPoints;
+	}
+	return (Event.Kind == EPuzzleBonus::Basic ? BasicBonusPoints : DirectionalBonusPoints) + PowerBonus(Event.ExtraTiles, 10);
+}
+
+void UPuzzleManager::SpawnDueBonusTiles()
+{
+	if (!bBonusTilesEnabled || !GridManager)
 	{
 		return;
 	}
-
-	// A hex with no moves to steal would be an empty threat: the storm comes instead.
-	const EOmen Omen = (MovesLeft > HexMoveCost && FMath::RandBool()) ? EOmen::Hex : EOmen::Lightning;
-	FIntPoint Cell(AGridManager::GridSize / 2, AGridManager::GridSize / 2);
-	if (Omen == EOmen::Lightning)
+	// One tile (or pair) per scoring step, however far a big clear carries the score past the marks.
+	FIntPoint Cell;
+	if (Score >= NextBasicBonusScore)
 	{
-		Cell = GridManager->PickLightningTarget();
-		if (Cell.X < 0)
+		NextBasicBonusScore = (Score / BasicBonusEvery + 1) * BasicBonusEvery;
+		if (GridManager->CountBonusTiles(EPuzzleBonus::Basic) < MaxBasicBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Basic, Cell))
 		{
-			return; // nothing left to strike
+			OnBonusSpawned.Broadcast(Cell);
 		}
 	}
-	MovesSinceOmen = 0;
+	if (Score >= NextPairBonusScore)
+	{
+		NextPairBonusScore = (Score / PairBonusEvery + 1) * PairBonusEvery;
+		if (GridManager->CountBonusTiles(EPuzzleBonus::Outgoing) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Outgoing, Cell))
+		{
+			OnBonusSpawned.Broadcast(Cell);
+		}
+		if (GridManager->CountBonusTiles(EPuzzleBonus::Incoming) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Incoming, Cell))
+		{
+			OnBonusSpawned.Broadcast(Cell);
+		}
+	}
+}
 
-	const bool bWarded = FMath::FRand() < GetWardChance();
-	if (bWarded)
+void UPuzzleManager::AddLuck(int32 Delta)
+{
+	if (bLuckEnabled)
 	{
-		AddLuck(-WardLuckCost);
+		Luck = FMath::Clamp(Luck + Delta, 0, MaxLuck);
 	}
-	else if (Omen == EOmen::Hex)
-	{
-		MovesLeft -= HexMoveCost;
-	}
-	if (Omen == EOmen::Lightning)
-	{
-		GridManager->StrikeLightning(Cell, OmenDelay, bWarded);
-	}
-	else
-	{
-		GridManager->PlayHex(OmenDelay, bWarded);
-	}
-	OnOmen.Broadcast(Omen, bWarded, Cell);
 }
 
 void UPuzzleManager::GrantRelics()
@@ -251,50 +245,16 @@ void UPuzzleManager::GrantRelics()
 	}
 }
 
-void UPuzzleManager::AddQuestProgress(const FClearResult& Result)
-{
-	if (Mode != EPlayMode::Quest)
-	{
-		return;
-	}
-	switch (Quest.Goal)
-	{
-	case EQuestGoal::CollectSymbol: QuestProgress += Result.ColorCounts[static_cast<int32>(Quest.Color)]; break;
-	case EQuestGoal::ClearLines:    QuestProgress += Result.Lines; break;
-	case EQuestGoal::ClearBoxes:    QuestProgress += Result.Boxes; break;
-	case EQuestGoal::BreakStones:   QuestProgress += Result.StonesBroken; break;
-	case EQuestGoal::ReachScore:    QuestProgress = Score; break;
-	}
-}
-
-int32 UPuzzleManager::ComputeStars() const
-{
-	if (!bWon)
-	{
-		return 0;
-	}
-	const float Spare = static_cast<float>(MovesLeft) / FMath::Max(Quest.Moves, 1);
-	return Spare >= 0.4f ? 3 : (Spare >= 0.2f ? 2 : 1);
-}
-
 void UPuzzleManager::CheckForEnd()
 {
 	if (bFinished)
 	{
 		return;
 	}
-	if (Mode == EPlayMode::Quest && QuestProgress >= Quest.Target)
-	{
-		bFinished = true;
-		bWon = true;
-		OnFinished.Broadcast(true);
-		return;
-	}
 	if (IsGameOver())
 	{
 		bFinished = true;
-		bWon = false;
-		OnFinished.Broadcast(false);
+		OnFinished.Broadcast();
 	}
 }
 

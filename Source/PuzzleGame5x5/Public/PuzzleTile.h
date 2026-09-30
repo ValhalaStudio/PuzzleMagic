@@ -11,8 +11,8 @@ class UStaticMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 
-// Rounded bevelled enamel block with a gold bezel border and a gold symbol inlay
-// per colour. The box collision root is what simulates physics when the tile is cleared.
+// Rounded bevelled enamel block with a gold bezel border and a gold triangle inlay that
+// shows the direction a route flows through it. The box collision root is what simulates physics when the tile is cleared.
 UCLASS()
 class PUZZLEGAME5X5_API APuzzleTile : public AActor
 {
@@ -36,6 +36,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void SetTileColor(EPuzzleTileColor NewColor);
 
+	// The way this tile's triangle points (the way a route flows through it).
+	void SetDirection(EPuzzleDir NewDir);
+
+	// Turns this tile into a bonus tile: its own colour and emblem (none, a diamond, or a fisheye), no arrow,
+	// with the golden sheen sweeping over it.
+	void SetBonus(EPuzzleBonus NewBonus);
+
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void MoveToPosition(int32 NewGridX, int32 NewGridY);
 
@@ -50,18 +57,6 @@ public:
 	void PlayClearEffectAndDestroy(float Delay = 0.f, float LaunchStrength = 1.f);
 
 	void SetGhost(bool bValid);
-
-	// Gargoyle stone look: 2 = intact, 1 = cracked, 0 = normal tile.
-	void SetStone(int32 Level);
-
-	// Golden sheen sweeping over tiles inside the blessed box.
-	void SetShimmer(float Amount);
-
-	// A clear hit an intact stone: after Delay it shudders and cracks instead of popping.
-	void PlayStoneHit(float Delay);
-
-	// Lightning: after Delay the tile flashes and turns into an intact gargoyle stone.
-	void PlayPetrify(float Delay);
 
 	virtual void PostInitializeComponents() override;
 	virtual void Tick(float DeltaTime) override;
@@ -84,7 +79,7 @@ protected:
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
 private:
-	enum class EAnim : uint8 { None, Arriving, Squash, ClearPending, Popping, Flying, StoneHit };
+	enum class EAnim : uint8 { None, Arriving, Squash, ClearPending, Popping, Flying };
 
 	void ApplyVisualState();
 	void Launch();
@@ -103,8 +98,10 @@ private:
 
 	float LaunchStrength = 1.f;
 	float CurrentGlow = 0.f;
-	float CurrentStone = 0.f;
-	float CurrentShimmer = 0.f;
-	// The StoneHit animation is turning this tile to stone rather than cracking it.
-	bool bPetrifying = false;
+	EPuzzleDir TileDirection = EPuzzleDir::Up;
+	bool bHasDirection = false;
+	EPuzzleBonus Bonus = EPuzzleBonus::None;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> BonusMaterial;
 };
