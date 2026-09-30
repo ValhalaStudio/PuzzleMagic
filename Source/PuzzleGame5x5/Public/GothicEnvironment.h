@@ -24,12 +24,6 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-	// An omen's lightning: the windows flash after Delay (the strike's own sound is played by the game mode).
-	void TriggerStrike(float Delay);
-
-	// Curses and omens jolt the dread up; it eases back to what the player's luck warrants.
-	void AddDread(float Amount);
-
 	// Flips the wall/glass UVs if the plane's UV orientation doesn't match the window layout.
 	UPROPERTY(EditAnywhere, Category = "Gothic")
 	FVector2D WallUVFlip = FVector2D(0.f, 0.f);
@@ -87,7 +81,6 @@ private:
 	TArray<FTentacle> Tentacles;
 	TArray<FEye> Eyes;
 	float Dread = 0.f;
-	float DreadSpike = 0.f;
 	float FlickerStart = -100.f;
 	float FlickerDuration = 1.f;
 	float NextFlickerTime = 25.f;
@@ -186,7 +179,6 @@ private:
 	float StrikeTime = -100.f;
 	float ThunderTime = -1.f;
 	float StrikeSeed = 0.f;
-	float PendingStrikeTime = -1.f;
 
 	UPROPERTY(EditAnywhere, Category = "Gothic")
 	float ThunderVolume = 0.4f;

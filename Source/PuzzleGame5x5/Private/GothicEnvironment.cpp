@@ -93,10 +93,6 @@ UStaticMeshComponent* AGothicEnvironment::AddMesh(UStaticMesh* Mesh, const FTran
 
 void AGothicEnvironment::AddCandle(const FVector& Base, float Height, float Radius, bool bCastShadows)
 {
-	// MegaLights ray-traces shadows for any number of lights at a fixed cost, so then every flame casts them.
-	static const IConsoleVariable* MegaLights = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MegaLights.EnableForProject"));
-	bCastShadows |= MegaLights && MegaLights->GetInt() != 0;
-
 	UMaterialInstanceDynamic* Wax = UMaterialInstanceDynamic::Create(MarbleMaterial, this);
 	Wax->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.78f, 0.7f, 0.52f));
 	Wax->SetScalarParameterValue(TEXT("VeinStrength"), 0.f);
@@ -199,7 +195,7 @@ void AGothicEnvironment::BeginPlay()
 	}
 
 	// Damp flagstones over the map's floor (ComfyUI seamless texture + DeepBump normals, M_FloorSlab):
-	// the dark wet areas are glossy, so candles and lightning reflect in them (ray-traced reflections).
+	// the dark wet areas are glossy, so candles and lightning reflect in them.
 	if (UMaterialInterface* Floor = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_FloorSlab.M_FloorSlab")))
 	{
 		AddMesh(PlaneMesh, FTransform(FRotator::ZeroRotator, FVector(0.f, 0.f, 0.6f), FVector(60.f, 60.f, 1.f)), Floor, false);
@@ -239,16 +235,6 @@ void AGothicEnvironment::BeginPlay()
 	}
 
 	BuildEldritch();
-}
-
-void AGothicEnvironment::TriggerStrike(float Delay)
-{
-	PendingStrikeTime = GetWorld()->GetTimeSeconds() + Delay;
-}
-
-void AGothicEnvironment::AddDread(float Amount)
-{
-	DreadSpike = FMath::Min(DreadSpike + Amount, 1.f);
 }
 
 namespace
@@ -327,7 +313,7 @@ void AGothicEnvironment::BuildEldritch()
 			{ -170.f, -780.f, 600.f, 52.f, 0.15f }, { 480.f, -800.f, 680.f, 58.f, 0.3f }, { -500.f, -770.f, 560.f, 50.f, 0.45f },
 			{ 140.f, -820.f, 460.f, 40.f, 0.6f }, { 20.f, -740.f, 380.f, 34.f, 0.75f },
 			// Beyond the wall: giants between the storm and the windows. Unseen directly (the glass is
-			// in the way), but every lightning flash throws their ray-traced shadows into the nave.
+			// in the way), but every lightning flash throws their shadows into the nave.
 			{ -640.f, WallY - 280.f, 1500.f, 150.f, 0.35f }, { 60.f, WallY - 360.f, 1800.f, 180.f, 0.5f },
 			{ 660.f, WallY - 300.f, 1400.f, 140.f, 0.6f },
 		};
@@ -361,7 +347,7 @@ void AGothicEnvironment::BuildEldritch()
 	if (UMaterialInterface* EyeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_EldritchEye.M_EldritchEye")))
 	{
 		const FRotator FacingCamera = FRotationMatrix::MakeFromZX(FVector(0.f, 1.f, 0.f), FVector(1.f, 0.f, 0.f)).Rotator();
-		// Low on the wall: higher up, the HUD's top bar and badges cover it on a portrait screen.
+		// Low on the wall: higher up, the HUD's badges cover it.
 		const FVector2D Pairs[] = { { -600.f, 140.f }, { 590.f, 110.f }, { -240.f, 95.f }, { 250.f, 150.f }, { 10.f, 70.f } };
 		for (int32 Pair = 0; Pair < UE_ARRAY_COUNT(Pairs); ++Pair)
 		{
@@ -455,11 +441,10 @@ void AGothicEnvironment::BuildEldritch()
 
 void AGothicEnvironment::TickEldritch(float Time, float DeltaTime, float& OutLightScale, float& OutEldritch)
 {
-	// Dread: nothing while luck holds above 30, full when it's gone; omens add a spike that fades.
-	DreadSpike = FMath::Max(DreadSpike - DeltaTime * 0.12f, 0.f);
+	// Dread: nothing while luck holds above 30, full when it's gone.
 	// -dread=N on the command line holds it at least at N (for testing and demo recordings).
 	static const float MinDread = []() { float Value = 0.f; FParse::Value(FCommandLine::Get(), TEXT("dread="), Value); return FMath::Clamp(Value, 0.f, 1.f); }();
-	const float Target = FMath::Clamp(FMath::Max((0.3f - Fortune) / 0.3f + DreadSpike, MinDread), 0.f, 1.f);
+	const float Target = FMath::Clamp(FMath::Max((0.3f - Fortune) / 0.3f, MinDread), 0.f, 1.f);
 	Dread = FMath::FInterpTo(Dread, Target, DeltaTime, 0.8f);
 
 	// The room breathes: a slow 7-second swell and ebb of every light, deeper with dread.
@@ -797,14 +782,7 @@ void AGothicEnvironment::Tick(float DeltaTime)
 
 	// Lightning: a bright strike, a weaker return stroke, then a longer flickering afterglow.
 	// The ambient storm strikes more often the less luck there is.
-	if (PendingStrikeTime > 0.f && Time >= PendingStrikeTime)
-	{
-		PendingStrikeTime = -1.f;
-		StrikeTime = Time;
-		StrikeSeed = FMath::FRand() * 10.f;
-		NextStrikeTime = FMath::Max(NextStrikeTime, Time + 6.f);
-	}
-	else if (Time >= NextStrikeTime)
+	if (Time >= NextStrikeTime)
 	{
 		StrikeTime = Time;
 		StrikeSeed = FMath::FRand() * 10.f;

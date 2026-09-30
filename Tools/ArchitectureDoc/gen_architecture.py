@@ -6,7 +6,7 @@ What comes from the code (so the page can't drift from it):
     UPROPERTY/UFUNCTION specifiers, section headings and doc comments (a small C++ header parser);
   * every relationship arrow is checked against the .cpp line(s) that make it true: if a call or a
     spawn disappears from the code, generation fails and names the stale arrow;
-  * tunable constants, launch flags, the number of piece shapes and quest levels, line counts.
+  * tunable constants, launch flags, the number of piece shapes, line counts.
 What is written here by hand: lane assignment, one-line class summaries, relationship labels, and the
 prose/tables about tools and decisions.
 
@@ -451,39 +451,36 @@ CLASSES = [
     ("UPuzzleUIButton", "ui", "A UButton that never takes keyboard focus, so game keys keep reaching the player controller after a click.", False),
     ("UPuzzleButtonProxy", "ui", "One per button. UButton::OnClicked carries no payload, so the proxy remembers the action and its parameter (a level number, for example).", False),
     ("EPuzzleCard", "ui", "Which modal card the UI is showing.", False),
-    ("UMainMenuUI", "ui", "Widget from the original project zip. Nothing creates it; the menu is a card in UPuzzleHUDWidget.", True),
-    ("UPuzzleGameUI", "ui", "Widget from the original project zip. Nothing creates it; UPuzzleHUDWidget replaced it.", True),
 
-    ("APuzzleGameMode", "flow", "Composition root and conductor. StartPlay loads the save, creates the rules, spawns the board, input handler and cathedral, binds the seven rule events and reads the launch flags. It runs the flow (menu, level intro, playing, finished), turns rule events into sound, haptics, shake and UI, plays the music playlist and drives the demo bot.", False),
+    ("APuzzleGameMode", "flow", "Composition root and conductor. StartPlay loads the save, creates the rules, spawns the board, input handler and cathedral, binds the six rule events and reads the launch flags. It runs the flow (menu, level intro, playing, finished), turns rule events into sound, haptics, shake and UI, plays the music playlist and drives the demo bot.", False),
     ("EPuzzleFlow", "flow", "Where the game is: menu, level intro, playing or finished.", False),
     ("APuzzleInputHandler", "flow", "Turns mouse and touch drags, and SDL3 gamepad navigation, into rule calls: pick a tray piece, show the ghost preview, place, park in HOLD, aim Holy Light. Board input only works while the game mode says the player is playing.", False),
     ("UPuzzleSDLGamepadSubsystem", "flow", "Game-instance subsystem over SDL3's gamepad API. Opens the first controller, polls SDL events every tick and exposes just-pressed buttons and the left stick.", False),
-    ("APuzzleCameraPawn", "flow", "Fixed camera that frames board and tray on any screen shape, portrait phones included. It also owns the post-process setup (manual exposure, grade, grain, lens flares, ink outline) and screen shake.", False),
-    ("UPuzzleSaveGame", "flow", "Quest progress (highest unlocked level, best stars per level), the best Endless score and whether How to Play was seen.", False),
+    ("APuzzleCameraPawn", "flow", "Fixed camera that frames board and tray in any landscape window. It also owns the post-process setup (manual exposure, grade, grain, lens flares, ink outline) and screen shake.", False),
+    ("UPuzzleSaveGame", "flow", "The best score and whether How to Play was seen.", False),
 
-    ("UPuzzleManager", "rules", "The rules: scoring, the three-placement combo window, the move budget and refunds, relics, gargoyle stones, quest goals, luck and omens. It changes state at once and broadcasts events; everything you see and hear happens elsewhere, later.", False),
+    ("UPuzzleManager", "rules", "The rules: scoring, the three-placement combo window, the move budget and refunds, relics and luck. It changes state at once and broadcasts events; everything you see and hear happens elsewhere, later.", False),
     ("FPuzzleClearEvent", "rules", "Everything the presentation needs to celebrate one clear: the clear result, points, bonus moves, combo and where it happened.", False),
     ("UPuzzleBotPlayer", "rules", "Greedy demo bot. Tries every tray piece at every cell, prefers moves that clear lines, then tight packing; uses relics when stuck or crowded.", False),
-    ("QuestCatalog", "rules", "The hand-tuned quest levels (goal, target, move budget, gargoyle interval) and the sentence that describes each goal.", False),
     ("PieceLibrary", "rules", "The piece shapes, from the single cell to the five-cell pieces, and random piece drawing.", False),
-    ("FQuestLevel", "rules", "One quest level: its goal, target, sigil colour, move budget and gargoyle interval.", False),
     ("FPuzzlePieceShape", "rules", "A piece: occupied cell offsets from its top-left origin, plus its colour.", False),
     ("PuzzleTypes", "rules", "The tile palette (ToLinearColor) and the number of sigil colours.", False),
     ("EPuzzleTileColor", "rules", "The five sigils: red blood drop, green skull, blue moon, yellow cross, purple bat.", False),
-    ("EOmen", "rules", "Misfortunes luck can ward off.", False),
+    ("EPuzzleBonus", "rules", "The bonus tile kinds: basic, outgoing and incoming.", False),
+    ("EPuzzleDir", "rules", "The way a tile's triangle points, and so the way a route flows through it: up, right, down, left.", False),
     ("ERelic", "rules", "The two relics.", False),
-    ("EQuestGoal", "rules", "What a quest level asks for.", False),
-    ("EPlayMode", "rules", "Endless or a quest level.", False),
     ("EPuzzleGamepadButton", "rules", "Gamepad actions the input handler reads.", False),
 
-    ("AGridManager", "board", "Owns the 9×9 board state (filled cells, colours, stone levels), the tray of three plus HOLD, the blessed box, and every board visual: tiles, ghost previews, rune circles, clear pops, lightning strikes and hex effects.", False),
-    ("FClearResult", "board", "What one clear did: lines, cells and boxes cleared, blessings, stones cracked or broken, counts per colour.", False),
-    ("APuzzleTile", "board", "One lacquered tile or gargoyle stone: the shared realtime mesh (enamel body plus gold bezel), a box collider for physics bursts, and its own animation states (arrive, squash, pop, fly, stone hit, petrify).", False),
-    ("APuzzleFX", "board", "One-shot effects that destroy themselves when done: sparkles, glow strips, rings, lightning bolts, rune circles and real, shadow-casting light flashes.", False),
+    ("AGridManager", "board", "Owns the 8×8 board state (filled cells and colours), the tray of three plus HOLD, and every board visual: tiles, ghost previews, rune circles and clear pops.", False),
+    ("FClearResult", "board", "What one clear did: the routes (with their extra tiles, for scoring), the cells cleared, and the cells of closed circuits.", False),
+    ("FBonusEvent", "board", "One bonus tile cleared by a chain: its kind, whether it was linked to a partner, the chain cells and the tiles beyond the straight line to a side.", False),
+    ("FRouteInfo", "board", "One completed route: its cells in flow order, whether it joins neighbouring sides, and its tiles beyond the basic length.", False),
+    ("APuzzleTile", "board", "One lacquered tile: the shared realtime mesh (enamel body plus gold bezel), a box collider for physics bursts, and its own animation states (arrive, squash, pop, fly).", False),
+    ("APuzzleFX", "board", "One-shot effects that destroy themselves when done: sparkles, glow strips, rings, rune circles and real, shadow-casting light flashes.", False),
     ("MeshBuffers", "board", "Turns ToonMesh buffers into realtime meshes: meshoptimizer ordering, one section per material slot, and a process-wide cache so every tile shares one mesh.", False),
     ("ToonMesh", "board", "Procedural geometry: rounded, bevelled blocks and their outline hulls as raw vertex buffers.", False),
 
-    ("AGothicEnvironment", "atmos", "The cathedral around the board and its moods: wall, stained glass, Blender-made piers, candles, flagstones, lightning, and the Lovecraftian layer. Dread (low luck plus omen spikes) drives breathing and stuttering light, tentacles, eyes, fog, motes, the madness post-process, the MetaSound ambience and the convolution reverb.", False),
+    ("AGothicEnvironment", "atmos", "The cathedral around the board and its moods: wall, stained glass, Blender-made piers, candles, flagstones, ambient storms, and the Lovecraftian layer. Dread (low luck) drives breathing and stuttering light, tentacles, eyes, fog, motes, the madness post-process, the MetaSound ambience and the convolution reverb.", False),
     ("EldritchNoise", "atmos", "Fractal noise for organic shapes and light: FastNoise2 SIMD on Windows, FMath::PerlinNoise elsewhere.", False),
 ]
 
@@ -498,8 +495,6 @@ EXTERNALS = [
      "summary": "SIMD fractal noise with runtime SSE2 to AVX-512 dispatch."},
     {"id": "lib_Audio", "name": "MetaSounds · Synthesis", "stereo": "engine plugins", "path": "Engine/Plugins/Runtime", "version": "UE 5.8",
      "summary": "The MS_Abyss graph and the convolution reverb on the SM_Cathedral submix."},
-    {"id": "lib_FSR", "name": "AMD FSR", "stereo": "project plugin", "path": "Plugins/FSR", "version": "4.1.1 · Win64",
-     "summary": "Optional temporal upscaler, switched on with -fsr."},
 ]
 
 EDGE_KINDS = [
@@ -515,24 +510,21 @@ RELATIONS = [
     ("APuzzleGameMode", "UPuzzleManager", "own", "creates the rules", [(GM, r"NewObject<UPuzzleManager>")]),
     ("APuzzleGameMode", "AGridManager", "own", "spawns the board", [(GM, r"SpawnActor<AGridManager>")]),
     ("APuzzleGameMode", "APuzzleInputHandler", "own", "spawns", [(GM, r"SpawnActor<APuzzleInputHandler>")]),
-    ("APuzzleGameMode", "AGothicEnvironment", "own", "spawns · TriggerStrike · AddDread", [(GM, r"SpawnActor<AGothicEnvironment>"), (GM, r"Environment->TriggerStrike"), (GM, r"Environment->AddDread")]),
+    ("APuzzleGameMode", "AGothicEnvironment", "own", "spawns", [(GM, r"SpawnActor<AGothicEnvironment>")]),
     ("APuzzleGameMode", "UPuzzleBotPlayer", "own", "creates · TakeBestAction", [(GM, r"NewObject<UPuzzleBotPlayer>"), (GM, r"BotPlayer->TakeBestAction")]),
-    ("APuzzleGameMode", "APuzzleFX", "own", "celebration burst", [(GM, r"SpawnActor<APuzzleFX>")]),
     ("APuzzleGameMode", "UPuzzleSaveGame", "call", "LoadOrCreate · Save", [(GM, r"UPuzzleSaveGame::LoadOrCreate"), (GM, r"SaveGame->Save\(\)")]),
-    ("APuzzleGameMode", "UPuzzleHUDWidget", "call", "ShowCard · ShowClear · ShowOmen", [(GM, r"UI->ShowCard"), (GM, r"UI->ShowClear"), (GM, r"UI->ShowOmen")]),
+    ("APuzzleGameMode", "UPuzzleHUDWidget", "call", "ShowCard · ShowClear", [(GM, r"UI->ShowCard"), (GM, r"UI->ShowClear")]),
     ("APuzzleGameMode", "APuzzleCameraPawn", "call", "SetFramingBounds · AddShake", [(GM, r"CameraPawn->SetFramingBounds"), (GM, r"CameraPawn->AddShake")]),
-    ("APuzzleGameMode", "QuestCatalog", "call", "level data", [(GM, r"QuestCatalog::Get")]),
-    ("APuzzleGameMode", "lib_FSR", "lib", "-fsr turns it on", [(GM, r"r\.FidelityFX\.FSR\.Enabled")]),
-    ("UPuzzleManager", "APuzzleGameMode", "event", "7 events: OnCleared, OnOmen, OnFinished…", [(GM, r"PuzzleManager->OnPiecePlaced\.AddUObject"), (GM, r"PuzzleManager->OnCleared\.AddUObject"), (GM, r"PuzzleManager->OnComboBroken\.AddUObject"), (GM, r"PuzzleManager->OnRelicGained\.AddUObject"), (GM, r"PuzzleManager->OnStoneSpawned\.AddUObject"), (GM, r"PuzzleManager->OnOmen\.AddUObject"), (GM, r"PuzzleManager->OnFinished\.AddUObject")]),
-    ("UPuzzleManager", "AGridManager", "call", "PlacePieceAt · CheckAndClearLines · StrikeLightning · PlayHex", [("PuzzleManager.cpp", r"GridManager->PlacePieceAt"), ("PuzzleManager.cpp", r"GridManager->CheckAndClearLines"), ("PuzzleManager.cpp", r"GridManager->StrikeLightning"), ("PuzzleManager.cpp", r"GridManager->PlayHex"), ("PuzzleManager.cpp", r"GridManager->SpawnCurseStone")]),
+    ("UPuzzleManager", "APuzzleGameMode", "event", "6 events: OnCleared, OnBonusSpawned, OnFinished…", [(GM, r"PuzzleManager->OnPiecePlaced\.AddUObject"), (GM, r"PuzzleManager->OnCleared\.AddUObject"), (GM, r"PuzzleManager->OnComboBroken\.AddUObject"), (GM, r"PuzzleManager->OnRelicGained\.AddUObject"), (GM, r"PuzzleManager->OnBonusSpawned\.AddUObject"), (GM, r"PuzzleManager->OnFinished\.AddUObject")]),
+    ("UPuzzleManager", "AGridManager", "call", "PlacePieceAt · CheckAndClearLines", [("PuzzleManager.cpp", r"GridManager->PlacePieceAt"), ("PuzzleManager.cpp", r"GridManager->CheckAndClearLines")]),
     ("APuzzleInputHandler", "UPuzzleManager", "call", "TryPlacePiece · ParkPiece · UseHolyLight", [("PuzzleInputHandler.cpp", r"PuzzleManager->TryPlacePiece"), ("PuzzleInputHandler.cpp", r"PuzzleManager->ParkPiece"), ("PuzzleInputHandler.cpp", r"PuzzleManager->UseHolyLight")]),
     ("APuzzleInputHandler", "AGridManager", "call", "picking · ghost preview · aim circle", [("PuzzleInputHandler.cpp", r"GridManager->FindTraySlotAt"), ("PuzzleInputHandler.cpp", r"GridManager->ShowGhostPreview"), ("PuzzleInputHandler.cpp", r"GridManager->ShowAreaTarget")]),
     ("APuzzleInputHandler", "UPuzzleSDLGamepadSubsystem", "call", "polls buttons", [("PuzzleInputHandler.cpp", r"GetSubsystem<UPuzzleSDLGamepadSubsystem>"), ("PuzzleInputHandler.cpp", r"GamepadSubsystem->WasButtonJustPressed")]),
-    ("APuzzleInputHandler", "APuzzleGameMode", "call", "ToggleAutoPlay · Retry", [("PuzzleInputHandler.cpp", r"GameMode->ToggleAutoPlay"), ("PuzzleInputHandler.cpp", r"GameMode->Retry")]),
+    ("APuzzleInputHandler", "APuzzleGameMode", "call", "TogglePauseMenu · Retry", [("PuzzleInputHandler.cpp", r"GameMode->TogglePauseMenu"), ("PuzzleInputHandler.cpp", r"GameMode->Retry")]),
     ("UPuzzleBotPlayer", "UPuzzleManager", "call", "TryPlacePiece · UseReroll · UseHolyLight", [("PuzzleBotPlayer.cpp", r"PuzzleManager->TryPlacePiece"), ("PuzzleBotPlayer.cpp", r"PuzzleManager->UseReroll"), ("PuzzleBotPlayer.cpp", r"PuzzleManager->UseHolyLight")]),
     ("UPuzzleBotPlayer", "AGridManager", "call", "SimulateLinesCleared · FindDensestArea", [("PuzzleBotPlayer.cpp", r"GridManager->SimulateLinesCleared"), ("PuzzleBotPlayer.cpp", r"GridManager->FindDensestArea")]),
     ("AGridManager", "APuzzleTile", "own", "spawns cells, tray pieces, ghosts", [("GridManager.cpp", r"SpawnActor<APuzzleTile>")]),
-    ("AGridManager", "APuzzleFX", "own", "clears · bolts · hexes", [("GridManager.cpp", r"SpawnActor<APuzzleFX>")]),
+    ("AGridManager", "APuzzleFX", "own", "clears · rerolls", [("GridManager.cpp", r"SpawnActor<APuzzleFX>")]),
     ("AGridManager", "PieceLibrary", "call", "MakeRandomPiece", [("GridManager.cpp", r"PieceLibrary::")]),
     ("AGridManager", "MeshBuffers", "call", "builds the board mesh", [("GridManager.cpp", r"MeshBuffers::BuildRealtimeMesh")]),
     ("AGridManager", "ToonMesh", "call", "blocks and hulls", [("GridManager.cpp", r"ToonMesh::BuildBlock")]),
@@ -547,41 +539,39 @@ RELATIONS = [
     ("AGothicEnvironment", "lib_Audio", "lib", "MS_Abyss · convolution reverb", [("GothicEnvironment.cpp", r"MS_Abyss"), ("GothicEnvironment.cpp", r"USubmixEffectConvolutionReverbPreset")]),
     ("EldritchNoise", "lib_FastNoise2", "lib", "FractalFBm(Simplex)", [("EldritchNoise.cpp", r"FastNoise::New")]),
     ("APuzzleHUD", "UPuzzleHUDWidget", "own", "creates", [("PuzzleHUD.cpp", r"CreateWidget<UPuzzleHUDWidget>")]),
-    ("UPuzzleHUDWidget", "APuzzleGameMode", "call", "button actions: StartEndless · SelectLevel…", [("PuzzleHUDWidget.cpp", r"GameMode->StartEndless"), ("PuzzleHUDWidget.cpp", r"GameMode->SelectLevel")]),
+    ("UPuzzleHUDWidget", "APuzzleGameMode", "call", "button actions: StartEndless · Retry…", [("PuzzleHUDWidget.cpp", r"GameMode->StartEndless"), ("PuzzleHUDWidget.cpp", r"GameMode->Retry")]),
     ("UPuzzleHUDWidget", "UPuzzleManager", "call", "polls score · moves · combo · luck", [("PuzzleHUDWidget.cpp", r"Rules->GetLuck\(\)"), ("PuzzleHUDWidget.cpp", r"Rules->ComboStreak")]),
     ("UPuzzleHUDWidget", "APuzzleInputHandler", "call", "targeting and HOLD hover state", [("PuzzleHUDWidget.cpp", r"InputHandler->IsHolyTargeting"), ("PuzzleHUDWidget.cpp", r"InputHandler->IsHoveringReserve")]),
     ("UPuzzleHUDWidget", "AGridManager", "call", "places the HOLD label", [("PuzzleHUDWidget.cpp", r"GridManager->GetTrayAnchorWorldLocation")]),
     ("UPuzzleHUDWidget", "UPuzzleButtonProxy", "own", "one per button", [("PuzzleHUDWidget.cpp", r"NewObject<UPuzzleButtonProxy>")]),
     ("UPuzzleHUDWidget", "UPuzzleUIButton", "own", "every button", [("PuzzleHUDWidget.cpp", r"ConstructWidget<UPuzzleUIButton>")]),
-    ("UPuzzleHUDWidget", "QuestCatalog", "call", "level cards", [("PuzzleHUDWidget.cpp", r"QuestCatalog::")]),
     ("UPuzzleButtonProxy", "UPuzzleHUDWidget", "call", "HandleAction", [("PuzzleHUDWidget.cpp", r"Widget->HandleAction")]),
     ("UPuzzleSDLGamepadSubsystem", "lib_SDL3", "lib", "SDL gamepad API", [("PuzzleSDLGamepadSubsystem.cpp", r"SDL_GetGamepadButton")]),
 ]
 
 FLAG_TEXT = {
     "demo": "Endless mode with the demo bot playing.",
-    "demoquest": "The bot plays the quest levels from level N (default 1). Its results are never saved.",
-    "level": "Open quest level N's intro card.",
     "tutorial": "Show the How to Play pages even if they were seen before.",
     "tutorialpage": "Open How to Play at page N (0-based).",
-    "omenrate": "Fixed omen chance per move, 0 to 1. For testing.",
     "dread": "Hold dread at X or above, 0 to 1. For testing and recordings.",
-    "fsr": "AMD FSR upscaling (Quality) instead of TSR. Windows only.",
+    "grid": "Board size, each side 4 to 8, for example 5x7.",
     "recordaudio": "Record the game's audio mix for N seconds to Saved/Recording/demo_audio.wav, then quit.",
 }
 
-FLAG_ARG = {"demoquest": "[=N]", "level": "=N", "tutorialpage": "=N", "omenrate": "=X", "dread": "=X", "recordaudio": "=N"}
+FLAG_ARG = {"grid": "=WxH", "tutorialpage": "=N", "dread": "=X", "recordaudio": "=N"}
 
 SCRIPTS = [
     ("arcane_head.py", "Unreal editor Python", "Shared helpers for the material scripts: create or rebuild a material, custom HLSL nodes, parameters, and the NOISE and SYMBOLS HLSL libraries."),
     ("arcane_body.py", "Unreal editor Python", "M_TileArcane, M_HolyAura, M_PPInkOutline, M_UIPanel, M_UIIcon."),
     ("build_gothic_symbols.py", "Unreal editor Python", "M_TileGothic (the five sigils), M_UIIcon, M_GroundMist."),
+    ("build_route_tiles.py", "Unreal editor Python", "M_TileRoute: the tile material with a triangle inlay for the route direction."),
+    ("build_bonus_tiles.py", "Unreal editor Python", "M_TileBonus: the tile material for bonus tiles, which have no arrow but a diamond or fisheye emblem."),
     ("build_mist2.py", "Unreal editor Python", "M_GroundMist2."),
     ("build_storm_fx.py", "Unreal editor Python", "M_FXBolt, the lightning bolt."),
     ("build_eldritch_fx.py", "Unreal editor Python", "M_Tentacle, M_EldritchEye, M_PPMadness."),
     ("build_motes.py", "Unreal editor Python", "M_Mote, the instanced dust, ember and wisp particle."),
     ("gothic_audio.py", "rocm-env Python", "SFXG_Place, _Clear, _Blessed, _Holy, _GameOver, _Gargoyle, _Relic, _ComboLost, _Thunder and the organ loop MUS_Gothic."),
-    ("chant_audio.py", "rocm-env Python", "MUS_Chant (Faust singers, opening with the Dies irae) and SFXG_Strike, _Hex, _Ward."),
+    ("chant_audio.py", "rocm-env Python", "MUS_Chant (Faust singers, opening with the Dies irae)."),
     ("eldritch_audio.py", "rocm-env Python", "SFXG_Flicker, AMB_Abyss and its stems AMB_Drone, _Shepard, _Whisper, _Air."),
     ("audio_fx.py", "rocm-env Python (module)", "Faust bell and singer through DawDreamer, church convolution, pedalboard mastering. Used by the three audio scripts."),
     ("cathedral_ir.py", "rocm-env Python", "IR_Cathedral.wav, a reference copy of the impulse response the game synthesizes at start-up."),
@@ -742,14 +732,10 @@ def main():
         return ("%g" % v) if isinstance(v, float) else str(v)
 
     PM, GRID = "UPuzzleManager", "AGridManager"
-    grid_size, box_size = const(GRID, "GridSize"), const(GRID, "BoxSize")
-    arrive, omen_delay = const(GRID, "ArriveDuration"), const(PM, "OmenDelay")
+    grid_size, min_side = const(GRID, "MaxGridSide"), const(GRID, "MinGridSide")
+    arrive = const(GRID, "ArriveDuration")
     tile_spacing = const(GRID, "TileSpacing")
     shapes = len(re.findall(r"^\s*\{\s*\{", read(os.path.join(PUBLIC, "PieceLibrary.h")), flags=re.M))
-    levels = len(re.findall(r"\{\s*EQuestGoal::", read(os.path.join(PUBLIC, "QuestCatalog.h"))))
-    if grid_size % box_size:
-        fail("GridSize %s is not a multiple of BoxSize %s" % (grid_size, box_size))
-    lines_9 = grid_size * 2 + (grid_size // box_size) ** 2
 
     # ---- launch flags read from the code ----
     flags_found = {}
@@ -768,20 +754,19 @@ def main():
         (str(len(headers)), "headers"),
         ("{:,}".format(total_loc), "lines of C++"),
         (str(shapes), "piece shapes"),
-        (str(levels), "quest levels"),
         (str(len(relations)), "checked arrows"),
     ]
     facts_html = "".join("<div><dt>%s</dt><dd>%s</dd></div>" % (esc(label), esc(value)) for value, label in facts)
 
-    # Masthead mark: the 9x9 board with its alternating boxes and one row a tile short of clearing.
+    # Masthead mark: the 8x8 board as a checkerboard and one row a tile short of clearing.
     cell = 17
-    mark = ['<svg class="board-mark" viewBox="0 0 %d %d" role="img" aria-label="A 9 by 9 board of nine 3 by 3 boxes, one row a tile short of clearing" xmlns="http://www.w3.org/2000/svg">' % (grid_size * cell + 8, grid_size * cell + 8)]
+    mark = ['<svg class="board-mark" viewBox="0 0 %d %d" role="img" aria-label="An 8 by 8 board, one row a tile short of clearing" xmlns="http://www.w3.org/2000/svg">' % (grid_size * cell + 8, grid_size * cell + 8)]
     colours = ["t-red", "t-green", "t-blue", "t-yellow", "t-purple"]
     tiles = {(0, 4): 0, (1, 4): 0, (2, 4): 2, (3, 4): 3, (4, 4): 3, (6, 4): 1, (7, 4): 4, (8, 4): 2,
              (6, 1): 4, (7, 1): 4, (7, 2): 4, (1, 7): 1, (2, 7): 1, (2, 8): 1, (4, 6): 2}
     for y in range(grid_size):
         for x in range(grid_size):
-            light = ((x // box_size) + (y // box_size)) % 2 == 0
+            light = (x + y) % 2 == 0
             cls = colours[tiles[(x, y)]] if (x, y) in tiles else ("cell-a" if light else "cell-b")
             mark.append('<rect class="%s" x="%d" y="%d" width="%d" height="%d" rx="2.5"/>' % (cls, 4 + x * cell + 1, 4 + y * cell + 1, cell - 2, cell - 2))
     mark.append('<rect class="frame" x="1.5" y="1.5" width="%d" height="%d" rx="5"/>' % (grid_size * cell + 5, grid_size * cell + 5))
@@ -789,24 +774,33 @@ def main():
     board_mark = "".join(mark)
 
     L = lambda o, n: fmt(const(o, n))
+    pm_header = read(os.path.join(PUBLIC, "PuzzleManager.h"))
+
+    def sw(name):
+        m = re.search(r"bool %s = (true|false)" % name, pm_header)
+        if not m:
+            fail("switch %s not found in PuzzleManager.h" % name)
+        if name == "bMoveBudgetEnabled":
+            return "off, MVP"
+        return "option, on by default" if m.group(1) == "true" else "option, off by default"
     overview = """
 <h2>What this is</h2>
-<p class="kicker">A block-placement puzzle in the Woodoku family, built with Unreal Engine 5.8 and C++. It targets iPhone (portrait, touch first) and runs on Windows, where it also gets a ray-traced cathedral.</p>
-<p>You drag pieces from a tray of three onto a {g}×{g} board. Any full row, column or {b}×{b} box clears. The rules live in one plain object, <code>UPuzzleManager</code>, which changes state the moment a piece lands and broadcasts events. What you see and hear follows later, timed to the animations: the game mode turns rule events into sound, haptics, camera shake and UI, and the cathedral reads your luck to decide how dark the room gets.</p>
+<p class="kicker">A block-placement puzzle in the Woodoku family, built with Unreal Engine 5.8 and C++. It targets iPhone (landscape only, touch first) and runs on Windows.</p>
+<p>You drag pieces from a tray of three onto a board from {mn}×{mn} up to {g}×{g}. Any route clears: a chain of tiles, each pointing at the next, from one side of the board to the opposite side. The rules live in one plain object, <code>UPuzzleManager</code>, which changes state the moment a piece lands and broadcasts events. What you see and hear follows later, timed to the animations: the game mode turns rule events into sound, haptics, camera shake and UI, and the cathedral reads your luck to decide how dark the room gets.</p>
 <div class="glance">
-  <div><h3>Board</h3><p>{g}×{g} cells and {lines} lines that can clear: {g} rows, {g} columns, {nb} boxes. A tray of {tray} pieces plus HOLD, drawn from {shapes} shapes.</p></div>
-  <div><h3>Combo</h3><p>A clear starts a combo that survives {cw} placements without a clear. Multi-line clears climb faster; a line of one sigil is Blessed; the box inside the rune circle scores ×3.</p></div>
-  <div><h3>Moves</h3><p>Each piece costs a move; clears refund moves. Endless starts with {moves}. Quest levels carry their own budget and earn 1 to 3 stars from the moves left.</p></div>
-  <div><h3>Relics</h3><p>One every {rs} combo steps, at most {rmax} of each. Holy Light purges a {b}×{b} area; Reroll replaces the tray.</p></div>
-  <div><h3>Curses</h3><p>Gargoyle stones land every few moves (every {stones} in Endless): a clear cracks one, a second shatters it. Omens strike too: lightning turns a tile to stone, a hex takes {hex} moves.</p></div>
-  <div><h3>Luck</h3><p>Starts at {luck0}. +{lstep} per combo step, −{lholy} for Holy Light, −{lre} for Reroll, −{lward} per ward. It is the chance, up to {lmax}%, that an omen is warded off.</p></div>
-  <div><h3>Modes</h3><p>Endless (best score saved) and {levels} quest levels, plus a demo mode where a greedy bot plays.</p></div>
-  <div><h3>Presentation</h3><p>Ray-traced cathedral on PC, a dread layer that wakes as luck runs out, an interface built in C++, a synthesized Gregorian score and a MetaSound ambience.</p></div>
+  <div><h3>Board</h3><p>Width and height each from {mn} to {g} cells. A tray of {tray} pieces plus HOLD, drawn from {shapes} shapes.</p></div>
+  <div><h3>Combo ({s_combo})</h3><p>A clear starts a combo that survives {cw} placements without a clear. Multi-line clears climb faster and multiply the score.</p></div>
+  <div><h3>Move budget ({s_moves})</h3><p>Each piece costs a move; clears refund moves. A round starts with {moves} and ends when they run out or no piece fits. With the budget off, only a full board ends the round.</p></div>
+  <div><h3>Relics ({s_relics})</h3><p>One every {rs} combo steps, at most {rmax} of each. Holy Light purges a 3×3 area; Reroll replaces the tray.</p></div>
+  <div><h3>Luck ({s_luck})</h3><p>Starts at {luck0}. +{lstep} per clear, −{lholy} for Holy Light, −{lre} for Reroll. It lights the candles in the cathedral: when it runs out, the dark wakes.</p></div>
+  <div><h3>Score</h3><p>2 per cleared tile and 15 per route, plus 10^n for a route n tiles longer than the straight line across (5^n between neighbouring sides), capped at 100,000 per route. Placing a piece scores nothing. Beat your saved best; a demo mode lets a greedy bot play.</p></div>
+  <div><h3>Presentation</h3><p>A Lumen-lit cathedral on PC, a dread layer that wakes as luck runs out, an interface built in C++, a synthesized Gregorian score and a MetaSound ambience.</p></div>
 </div>
-""".format(g=grid_size, b=box_size, lines=lines_9, nb=(grid_size // box_size) ** 2, tray=const(GRID, "TraySize"), shapes=shapes,
-           cw=L(PM, "ComboWindowMoves"), moves=L(PM, "EndlessStartingMoves"), rs=L(PM, "RelicComboStep"), rmax=L(PM, "MaxRelicCharges"),
-           stones=L(PM, "EndlessStoneInterval"), hex=L(PM, "HexMoveCost"), luck0=L(PM, "StartingLuck"), lstep=L(PM, "LuckPerComboStep"),
-           lholy=L(PM, "HolyLightLuckCost"), lre=L(PM, "RerollLuckCost"), lward=L(PM, "WardLuckCost"), lmax=L(PM, "MaxWardPercent"), levels=levels)
+""".format(g=grid_size, mn=min_side, tray=const(GRID, "TraySize"), shapes=shapes,
+           cw=L(PM, "ComboWindowMoves"), moves=L(PM, "StartingMovesCount"), rs=L(PM, "RelicComboStep"), rmax=L(PM, "MaxRelicCharges"),
+           luck0=L(PM, "StartingLuck"), lstep=L(PM, "LuckPerComboStep"),
+           lholy=L(PM, "HolyLightLuckCost"), lre=L(PM, "RerollLuckCost"),
+           s_combo=sw("bComboEnabled"), s_moves=sw("bMoveBudgetEnabled"), s_relics=sw("bRelicsEnabled"), s_luck=sw("bLuckEnabled"))
 
     # ---- architecture figure ----
     a = [svg_open(1200, 620, "Input reaches the rules; the rules change the board and broadcast events; the game mode turns events into UI, sound, camera shake and the cathedral's mood, which reads luck back from the rules.")]
@@ -815,7 +809,7 @@ def main():
     a.append(svg_node(40, 118, 220, 56, "APuzzleInputHandler", "pick · preview · place", "flow"))
     a.append(svg_node(330, 118, 240, 56, "UPuzzleBotPlayer", "demo mode", "rules"))
     a.append(svg_node(650, 118, 220, 56, "UPuzzleSaveGame", "stars · best score · tutorial", "flow"))
-    a.append(svg_node(330, 250, 240, 78, "UPuzzleManager", "score · combo · luck · omens", "rules"))
+    a.append(svg_node(330, 250, 240, 78, "UPuzzleManager", "score · combo · luck", "rules"))
     a.append(svg_node(650, 250, 220, 78, "APuzzleGameMode", "flow · feedback · music", "flow"))
     a.append(svg_node(960, 250, 200, 78, "AGothicEnvironment", "dread: light · tentacles · eyes", "atmos"))
     a.append(svg_node(330, 420, 240, 62, "AGridManager", "%d×%d state · tray · board visuals" % (grid_size, grid_size), "board"))
@@ -830,17 +824,14 @@ def main():
     a.append(svg_edge([(450, 174), (450, 250)]))
     a.append(svg_text(458, 216, "same calls", "start"))
     a.append(svg_edge([(570, 289), (650, 289)], "event"))
-    a.append(svg_text(610, 307, "7 events"))
+    a.append(svg_text(610, 307, "6 events"))
     a.append(svg_edge([(760, 250), (760, 174)]))
     a.append(svg_text(768, 216, "load · save", "start"))
     a.append(svg_edge([(870, 289), (960, 289)]))
-    a.append(svg_text(915, 280, "TriggerStrike"))
-    a.append(svg_text(915, 307, "AddDread"))
     a.append(svg_edge([(1060, 250), (1060, 96), (600, 96), (600, 270), (570, 270)], "read"))
     a.append(svg_text(830, 88, "reads GetLuck(): dread rises as luck falls"))
     a.append(svg_edge([(450, 328), (450, 420)]))
     a.append(svg_text(458, 364, "PlacePieceAt · CheckAndClearLines", "start"))
-    a.append(svg_text(458, 381, "StrikeLightning · PlayHex", "start"))
     a.append(svg_edge([(450, 482), (450, 548)]))
     a.append(svg_text(458, 520, "spawns", "start"))
     a.append(svg_edge([(760, 328), (760, 372), (705, 372), (705, 420)]))
@@ -856,7 +847,7 @@ def main():
         ("Source/PuzzleGame5x5", "All game code: Public headers, Private sources."),
         ("Source/MeshOptimizer", "meshoptimizer 1.3, compiled with the project."),
         ("Source/ThirdParty", "SDL3 and FastNoise2 as prebuilt external modules (Win64 libraries)."),
-        ("Plugins", "RealtimeMeshComponent (source) and AMD FSR (prebuilt, Win64)."),
+        ("Plugins", "RealtimeMeshComponent (source)."),
         ("Content", "Audio, Materials, Meshes, Textures, UI/Fonts and the one map."),
         ("Config", "DefaultEngine.ini (rendering, iOS, streaming), DefaultGame.ini (packaging), DefaultInput.ini."),
         ("Tools", "The scripts that build every asset, and this page's generator."),
@@ -875,7 +866,7 @@ def main():
 <p class="kicker">Input reaches the rules, the rules change the board and announce what happened, and the game mode decides how it looks and sounds.</p>
 <figure>
   <div class="fig-scroll">{svg}</div>
-  <figcaption>Solid arrows are calls, the dashed arrow is the rules' seven events, the dotted arrow is a read. Rule state changes in the frame of the drop; the game mode schedules the feedback to match the animations (see <a href="#move">A move</a>).</figcaption>
+  <figcaption>Solid arrows are calls, the dashed arrow is the rules' six events, the dotted arrow is a read. Rule state changes in the frame of the drop; the game mode schedules the feedback to match the animations (see <a href="#move">A move</a>).</figcaption>
 </figure>
 <h3>Decisions that shape the code</h3>
 <ol class="decisions">
@@ -884,7 +875,7 @@ def main():
   <li><b>Every asset comes from a script.</b> Materials are HLSL custom nodes written by Python in the editor, sounds are synthesized, meshes are procedural or scripted in Blender, and textures come from ComfyUI.</li>
   <li><b>Rebuildable assets load at run time.</b> An asset held by a C++ constructor (ConstructorHelpers) is rooted inside the editor commandlet, and rebuilding it there crashes. Newer assets use LoadObject so their scripts can rebuild them in place.</li>
   <li><b>All tiles share one mesh.</b> MeshBuffers builds the tile once as a realtime mesh and every tile's component points at it: one set of GPU buffers for the whole board.</li>
-  <li><b>PC gets ray tracing; iPhone gets the mobile renderer.</b> Lumen and MegaLights don't run on iOS in 5.8, so the phone look has to be authored for the mobile renderer.</li>
+  <li><b>PC gets Lumen; iPhone gets the mobile renderer.</b> Lumen doesn't run on iOS in 5.8, so the phone look has to be authored for the mobile renderer.</li>
   <li><b>Visual changes are checked in screenshots.</b> Logs stayed clean while the camera faced the sky and while meshes rendered inside out, so every visual change is verified with a capture of the running game.</li>
 </ol>
 <h3>Modules and folders</h3>
@@ -938,27 +929,21 @@ def main():
                  ("fx", "Tiles · FX", "board"), ("mode", "APuzzleGameMode", "flow"), ("pres", "HUD · sound · camera", "ui"),
                  ("env", "AGothicEnvironment", "atmos")]
     xs = {k: 160 + i * 158 for i, (k, _, _) in enumerate(lanes_seq)}
-    stone_at = arrive + 0.7 + 0.45
     rows = [
         ("0 s", "input", "rules", "TryPlacePiece(slot, x, y)", "call"),
         ("", "rules", "grid", "PlacePieceAt · CheckAndClearLines", "call"),
         ("", "grid", "fx", "spawns tiles; they fly in from the tray", "call"),
         ("", "rules", "rules", "score · combo window · refunds · luck · relics", "self"),
-        ("", "rules", "grid", "SpawnCurseStone (every Nth move) · RollOmen", "call"),
-        ("", "rules", "mode", "OnPiecePlaced · OnCleared · OnOmen · OnFinished", "event"),
+        ("", "rules", "mode", "OnPiecePlaced · OnCleared · OnFinished", "event"),
         ("", "mode", "mode", "Later(delay, …) schedules the feedback", "self"),
         ("%g s" % arrive, "mode", "pres", "tiles land: place sound · haptic · shake", "call"),
         ("%g s" % (arrive + 0.1), "grid", "fx", "cleared tiles pop and burst with physics", "call"),
         ("", "mode", "pres", "bell (higher with the combo) · ShowClear popups", "call"),
-        ("%g s" % omen_delay, "grid", "fx", "lightning bolt and light flash, or hex runes", "call"),
-        ("", "mode", "env", "TriggerStrike · AddDread", "call"),
-        ("", "mode", "pres", "strike or hex sound · LIGHTNING / HEXED / WARDED", "call"),
-        ("%g s" % stone_at, "mode", "pres", "gargoyle lands: stone sound · popup", "call"),
         ("2 s", "mode", "pres", "result card, if the round ended", "call"),
     ]
     top, dy = 96, 34
     height = top + len(rows) * dy + 10
-    s = [svg_open(1200, height, "Sequence of one move: the rules update at once and broadcast; tiles land at %g seconds, clears pop at %g, omens strike at %g, gargoyles land at %g." % (arrive, arrive + 0.1, omen_delay, stone_at))]
+    s = [svg_open(1200, height, "Sequence of one move: the rules update at once and broadcast; tiles land at %g seconds and clears pop at %g." % (arrive, arrive + 0.1))]
     for key, title, lane in lanes_seq:
         x = xs[key]
         s.append('<line class="life" x1="%d" y1="56" x2="%d" y2="%d"/>' % (x, x, height - 6))
@@ -982,28 +967,28 @@ def main():
 
     move = """
 <h2>A move, end to end</h2>
-<p class="kicker">What happens between dropping a piece and the last popup fading. Times come from <code>AGridManager::ArriveDuration</code> ({arrive:g} s) and <code>UPuzzleManager::OmenDelay</code> ({omen:g} s) in the code.</p>
+<p class="kicker">What happens between dropping a piece and the last popup fading. Times come from <code>AGridManager::ArriveDuration</code> ({arrive:g} s) in the code.</p>
 <figure>
   <div class="fig-scroll">{svg}</div>
-  <figcaption>The first seven messages happen in the frame of the drop: the rules already know the outcome, including any omen. Everything below a time mark is a delayed callback (<code>APuzzleGameMode::Later</code>) or a delayed animation, so the sound lands with the tile and the bolt lands with the flash.</figcaption>
+  <figcaption>The first six messages happen in the frame of the drop: the rules already know the outcome. Everything below a time mark is a delayed callback (<code>APuzzleGameMode::Later</code>) or a delayed animation, so the sound lands with the tile and the bolt lands with the flash.</figcaption>
 </figure>
 <h3>Start-up, in order</h3>
 <ol>
   <li><code>APuzzleGameMode::StartPlay</code> loads or creates the save (<code>UPuzzleSaveGame::LoadOrCreate</code>) and creates the rules.</li>
   <li>It spawns <code>AGridManager</code>, <code>APuzzleInputHandler</code> and <code>AGothicEnvironment</code>, binds the rules to the board and gives the input handler both.</li>
-  <li>It binds the seven rule events, creates the demo bot and frames the camera on the board and tray.</li>
+  <li>It binds the six rule events, creates the demo bot and frames the camera on the board and tray.</li>
   <li>It starts the music playlist: the chant twice, then the organ piece, crossfaded.</li>
   <li>It reads the launch flags (see <a href="#run">Run &amp; tune</a>) and opens the menu, with How to Play on the very first launch, or goes straight to a demo or a level.</li>
 </ol>
 <p>Meanwhile <code>AGothicEnvironment::BeginPlay</code> builds the wall, stained glass, piers, flagstones, mist and candles, attaches the convolution reverb to the <code>SM_Cathedral</code> submix and builds the dread layer: tentacles, eyes, fog volumes, motes, the madness post-process and the MetaSound ambience.</p>
-""".format(arrive=arrive, omen=omen_delay, svg=seq_svg)
+""".format(arrive=arrive, svg=seq_svg)
 
     # ---- tools and libraries ----
     engine_rows = [
-        ("Unreal Engine", "5.8", "Engine: rendering, UMG, audio, iPhone and Windows builds.", "One C++ codebase for the iPhone target and desktop ray tracing, with MetaSounds and editor Python built in."),
+        ("Unreal Engine", "5.8", "Engine: rendering, UMG, audio, iPhone and Windows builds.", "One C++ codebase for the iPhone target and desktop, with MetaSounds and editor Python built in."),
         ("MSVC (Visual Studio Build Tools 2022)", "14.44", "C++20 compiler for the Windows builds.", "Unreal 5.8's Windows toolchain. Installed on D: to spare the C: drive."),
         ("UMG, driven from C++", "engine", "Every screen, meter, card and popup.", "No Widget Blueprints: the UI is code, reviewable and diffable."),
-        ("Lumen hardware ray tracing, MegaLights, Virtual Shadow Maps, TSR", "engine", "The PC look: ray-traced light and reflections, a shadow from every candle.", "Runs at 70 to 85 FPS at 440×950 on the RX 6400. Not available on iOS, which uses the mobile renderer."),
+        ("Lumen, Virtual Shadow Maps, TSR", "engine", "The PC look: Lumen global illumination and reflections, shadow-casting lights.", "Runs at 70 to 85 FPS at 440×950 on the RX 6400. Not available on iOS, which uses the mobile renderer."),
         ("MetaSounds", "engine", "MS_Abyss: four ambience stems mixed live by dread, through a ladder filter.", "Parameter-driven mixing at run time instead of one fixed loop."),
         ("Synthesis plugin (convolution reverb)", "engine", "The SM_Cathedral submix reverb every sound effect sends to.", "Real convolution; the impulse response is synthesized at start-up, so there is no file to import or license."),
         ("Local Fog Volumes, instanced static meshes", "engine", "Floor fog; dust, embers and wisps in one draw call.", "Cheap on PC and on phones."),
@@ -1013,7 +998,6 @@ def main():
         ("RealtimeMeshComponent", "plugin 5.4", "Tiles, board and tentacles.", "Mesh data can be shared, so all tiles use one set of GPU buffers. Faster than ProceduralMeshComponent, which the code no longer uses."),
         ("meshoptimizer", "1.3", "Vertex-cache and vertex-fetch ordering of generated meshes.", "MIT, and builds from source for every platform."),
         ("FastNoise2", "1.1.1", "Tentacle skin, irregular breathing of the light.", "SIMD fractal noise. Windows only for now: an iOS build must be made on a Mac, and until then iOS uses FMath::PerlinNoise."),
-        ("AMD FSR", "4.1.1", "Optional upscaler (-fsr).", "Measured no faster than TSR at 440×950, so TSR stays the default; kept for large PC windows."),
         ("Lilita One, Cinzel Decorative", "OFL", "Body and title type in the UI.", "Loaded from .ttf files at run time, because importing fonts needs Slate, which commandlets lack."),
     ]
     pipe_rows = [
@@ -1118,50 +1102,18 @@ def main():
 """.format(svg=pipe_svg, scripts=table(["Script", "Runs in", "Produces"], script_rows),
            unscripted=("Materials in <code>Content/Materials</code> with no build script in <code>Tools/</code>: " + ", ".join("<code>%s</code>" % esc(m) for m in unscripted) + ". They came from earlier scripts that were not kept.") if unscripted else "Every material in Content/Materials has its build script in Tools/.")
 
-    # ---- why 9x9 ----
-    def board_svg(ox, oy, n, size, box, title, note1, note2):
-        cellw = size / n
-        out = [svg_text(ox + size / 2, oy - 14, title, "middle", "gridtitle")]
-        for y in range(n):
-            for x in range(n):
-                bx, by = x // box, y // box
-                whole = (bx + 1) * box <= n and (by + 1) * box <= n
-                cls = ("cell-a" if (bx + by) % 2 == 0 else "cell-b") if whole else "cell-bad"
-                out.append('<rect class="%s" x="%.1f" y="%.1f" width="%.1f" height="%.1f"/>' % (cls, ox + x * cellw, oy + y * cellw, cellw, cellw))
-        for i in range(n + 1):
-            out.append('<line class="gridline" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (ox + i * cellw, oy, ox + i * cellw, oy + size))
-            out.append('<line class="gridline" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (ox, oy + i * cellw, ox + size, oy + i * cellw))
-        for i in range(0, n + 1, box):
-            out.append('<line class="boxline" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (ox + i * cellw, oy, ox + i * cellw, oy + size))
-            out.append('<line class="boxline" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (ox, oy + i * cellw, ox + size, oy + i * cellw))
-        out.append('<rect class="boxline" x="%.1f" y="%.1f" width="%.1f" height="%.1f"/>' % (ox, oy, size, size))
-        out.append(svg_text(ox + size / 2, oy + size + 26, note1, "middle", "note"))
-        out.append(svg_text(ox + size / 2, oy + size + 44, note2, "middle", "note"))
-        return "".join(out)
-
-    g = [svg_open(640, 330, "An 8 by 8 board leaves 3 by 2, 2 by 3 and 2 by 2 fragments where the third row and column of boxes should be; a 9 by 9 board splits into nine whole 3 by 3 boxes.")]
-    g.append(board_svg(40, 48, 8, 216, box_size, "8 × 8", "16 lines: 8 rows, 8 columns", "shaded: box fragments (3×2, 2×3, 2×2)"))
-    g.append(board_svg(380, 48, grid_size, 216, box_size, "%d × %d" % (grid_size, grid_size), "%d lines: %d rows, %d columns, %d boxes" % (lines_9, grid_size, grid_size, (grid_size // box_size) ** 2), "every box is a whole 3×3"))
-    g.append('<rect class="ring" x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="3"/>' % (380 + 72, 48 + 72, 72, 72))
-    g.append("</svg>")
-    grid_svg = "".join(g)
+    # ---- why 8x8 ----
     grid = """
-<h2>Why 9×9, not 8×8</h2>
-<p class="kicker">The first request was an 8×8 board. The rules decided it: they clear rows, columns and 3×3 boxes, and boxes only tile a board whose side is a multiple of three.</p>
-<figure>
-  <div class="fig-small">{svg}</div>
-  <figcaption>Left: on 8×8 the third row and column of boxes are fragments. Right: 9×9 gives nine whole boxes, alternating in shade as the game draws them; the gold outline marks a blessed box.</figcaption>
-</figure>
-<p>On 8×8 the last row and column of boxes would be 3×2, 2×3 and 2×2 fragments. They are smaller targets, easier to fill than a real box, so the best play would drift to the board's right and bottom edges. Dropping boxes altogether would leave 16 lines and turn the game into a plain row-and-column puzzle.</p>
-<p>On {g}×{g} the board splits into nine whole boxes, like a Sudoku grid, and {lines} lines can clear instead of 16. Several features depend on whole boxes:</p>
+<h2>Board size</h2>
+<p class="kicker">The board is any width and height from {mn} to {g} cells, so the game can ask for harder or easier courses later.</p>
+<p>An earlier version used a 9×9 board where 3×3 boxes also cleared, because boxes only tile a board whose side is a multiple of three. Dropping boxes removed a whole layer of rules (box shading, box goals) and leaves routes as the only way to clear. <code>AGridManager::SetGridSize</code> rebuilds the frame, slots, tray and collision for a new size, and <code>-grid=WxH</code> picks one at launch.</p>
 <ul>
-  <li><b>The blessed box.</b> One of the nine is marked with a rune circle, and clearing it scores ×3.</li>
   <li><b>Holy Light</b> purges a 3×3 area around a chosen cell, with its centre clamped to cells 1 to {g2} so it always stays on the board.</li>
-  <li><b>Box shading.</b> Slots alternate indigo and burgundy per box (<code>AGridManager::BuildBoardVisuals</code>), so each box reads at a glance.</li>
-  <li><b>Goals and the bot.</b> Quest levels ask you to clear boxes, and the demo bot aims Holy Light at the densest 3×3 area (<code>FindDensestArea</code>).</li>
+  <li><b>Checkerboard slots.</b> Slots alternate indigo and burgundy per cell (<code>AGridManager::BuildBoardVisuals</code>), so the grid reads at a glance.</li>
+  <li><b>The bot</b> aims Holy Light at the densest 3×3 area (<code>FindDensestArea</code>).</li>
 </ul>
-<p>It also fits the phone. {g} cells at {sp} units each make an {w}-unit board inside the 1080-unit portrait canvas, with room for the tray below and the score above.</p>
-""".format(svg=grid_svg, g=grid_size, g2=grid_size - 2, lines=lines_9, sp=fmt(tile_spacing), w=fmt(tile_spacing * grid_size))
+<p>It also fits the phone. At {g} cells and {sp} units each the largest board is {w} units across, inside the landscape canvas (1080 units tall), with the tray below the board and the score at the top right. The tray row is wider than a 4-cell board, so small boards are framed by the tray.</p>
+""".format(g=grid_size, mn=min_side, g2=grid_size - 2, sp=fmt(tile_spacing), w=fmt(tile_spacing * grid_size))
 
     # ---- run and tune ----
     launcher_rows = []

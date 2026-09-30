@@ -22,13 +22,6 @@
 		{
 			"Name": "RealtimeMeshComponent",
 			"Enabled": true
-		},
-		{
-			"Name": "FSR",
-			"Enabled": true,
-			"PlatformAllowList": [
-				"Win64"
-			]
 		}
 	],
 	"TargetPlatforms": [

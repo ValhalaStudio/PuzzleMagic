@@ -1,9 +1,10 @@
 @echo off
-rem Launches the game in an iPhone-shaped portrait window with the computer playing (auto-play demo).
-rem In-game: P toggles demo/manual play, R restarts.
+rem Launches the game in a 1280x720 landscape window with the computer playing (auto-play demo).
+rem In-game: P opens the menu (take over there), R restarts.
 
 echo Launching game and preparing to record...
-start "" "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "%~dp0PuzzleGame5x5.uproject" -game -windowed -resx=440 -resy=950 -demo
+call "%~dp0Tools\FindUE.bat" || (pause & exit /b 1)
+start "" "%UE_EDITOR%" "%~dp0PuzzleGame5x5.uproject" -game -windowed -resx=1280 -resy=720 -demo
 
 rem Wait 4 seconds to give the engine time to launch and initialize the window viewport
 timeout /t 4 /nobreak

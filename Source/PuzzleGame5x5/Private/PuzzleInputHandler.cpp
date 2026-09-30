@@ -354,23 +354,23 @@ void APuzzleInputHandler::TickGamepadNavigation()
 
 	if (GamepadSubsystem->WasButtonJustPressed(EPuzzleGamepadButton::DPadRight))
 	{
-		CursorX = FMath::Clamp(CursorX + 1, 0, AGridManager::GridSize - 1);
+		CursorX = FMath::Clamp(CursorX + 1, 0, GridManager->GridWidth - 1);
 		bCursorMoved = true;
 	}
 	else if (GamepadSubsystem->WasButtonJustPressed(EPuzzleGamepadButton::DPadLeft))
 	{
-		CursorX = FMath::Clamp(CursorX - 1, 0, AGridManager::GridSize - 1);
+		CursorX = FMath::Clamp(CursorX - 1, 0, GridManager->GridWidth - 1);
 		bCursorMoved = true;
 	}
 
 	if (GamepadSubsystem->WasButtonJustPressed(EPuzzleGamepadButton::DPadUp))
 	{
-		CursorY = FMath::Clamp(CursorY + 1, 0, AGridManager::GridSize - 1);
+		CursorY = FMath::Clamp(CursorY + 1, 0, GridManager->GridHeight - 1);
 		bCursorMoved = true;
 	}
 	else if (GamepadSubsystem->WasButtonJustPressed(EPuzzleGamepadButton::DPadDown))
 	{
-		CursorY = FMath::Clamp(CursorY - 1, 0, AGridManager::GridSize - 1);
+		CursorY = FMath::Clamp(CursorY - 1, 0, GridManager->GridHeight - 1);
 		bCursorMoved = true;
 	}
 
@@ -426,7 +426,7 @@ void APuzzleInputHandler::OnToggleAutoPlayPressed()
 {
 	if (APuzzleGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<APuzzleGameMode>() : nullptr)
 	{
-		GameMode->ToggleAutoPlay();
+		GameMode->TogglePauseMenu();
 	}
 }
 

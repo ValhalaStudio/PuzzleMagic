@@ -1,21 +1,26 @@
 # Puzzle Magic
 
-A gothic 9×9 block puzzle with a Lovecraftian edge, made in Unreal Engine 5.8 with C++. Drag pieces onto the board and clear rows, columns and 3×3 boxes in a candle-lit cathedral that darkens and flickers as your luck runs out. It is laid out for iPhone (portrait) and is developed and played on Windows.
+A gothic 8×8 block puzzle with a Lovecraftian edge, made in Unreal Engine 5.8 with C++. Drag pieces onto the board and build routes across the board in a candle-lit cathedral that darkens and flickers as your luck runs out. It is a landscape-only game for iPhone and is developed and played on Windows.
 
-Demo recording: [Demo/PuzzleMagic_Demo.mp4](Demo/PuzzleMagic_Demo.mp4)
+Demo recording (made with an earlier version of the game): [Demo/PuzzleMagic_Demo.mp4](Demo/PuzzleMagic_Demo.mp4)
 
 ## The game
 
-- **9×9 board**: 9 rows, 9 columns and 9 boxes, so 27 lines can be cleared. Pieces come three at a time from 25 shapes, with a HOLD slot to keep one for later.
-- **Endless** play and **15 quest levels** with star ratings.
-- **Combos** earn a relic (Holy Light or Reroll) every third step. Luck grows with combos, is spent when relics are used, and wards off **omens**: lightning strikes and hexes. Gargoyle curse stones drop onto the board as you play.
-- **How to play** pages open on first launch, and a built-in bot can play by itself.
-- **Look and sound**: Lumen with hardware ray tracing and hit-lighting reflections, MegaLights, virtual shadow maps and TSR. The chant and organ music, sound effects and ambience are synthesized and play through a cathedral convolution reverb.
+Every tile carries a triangle that points up, right, down or left. Pieces come three at a time (plus a HOLD slot to keep one for later) from 12 shapes: a single tile, 2×1, 3×1 and 4×1 lines, a 2×2 square and a three-tile angle, each in every rotation. Each piece arrives with its triangles already set, and they cannot be rotated.
+
+- **Routes.** A chain of tiles that each point at the next, starting on one side of the board and ending with a tile that points off the far side, is a route, and the whole chain breaks apart. Several routes can clear at once. A route may also leave through a neighbouring side. A loop of tiles pointing round in a circle, or a chain that leaves through the side it started on, breaks apart too, but scores nothing. A lone tile pointing straight out of its own edge does nothing.
+- **Score.** Each cleared tile scores 2 and each route 15, plus a bonus of 10^n for a route n tiles longer than the straight line across (5^n between neighbouring sides), at most 100,000 per route. Placing a piece scores nothing. The round ends when no piece can be placed, and your best score is saved.
+- **Board size.** Any width and height from 4 to 8 (SELECT COURSE in the menu, or `-grid=WxH`). The default is 8×8.
+- **Bonus tiles** (Play options, off by default). Glowing tiles with no arrow drop onto the board as your score grows: a plain basic one every 1000 points (at most 2 on the board), and an outgoing (white diamond) and incoming (fisheye) pair every 10000 (at most 1 of each). A chain of arrows that links one to a side of the board clears it, together with the chain: 50 points for a basic tile and 250 for a directional one, plus 10^n for n chain tiles beyond the straight line to the nearest side. An outgoing tile sends a chain out through any neighbour, an incoming tile takes a chain arriving from any side, and a chain from an outgoing tile to an incoming one is worth 1000.
+- **Relics** (Play options, off by default). Switches on combos (clears on following moves multiply the score), relics (Holy Light purges a 3×3 area, Reroll replaces the tray) and luck, which lights the candles: as it runs out, the dark wakes.
+- **Menus.** P or the MENU button opens a menu (Take over or Resume, Main menu). The main menu has PLAY, SELECT COURSE, PLAY OPTIONS, DEMO (the bot plays) and HOW TO PLAY. The course and options are saved. The move budget from earlier versions is switched off for the MVP.
+- **Landscape only.** The interface scales with the screen height, menu cards shrink to fit small windows, the score sits in the top-right corner and the combo badge hangs between the candles.
+- **Look and sound.** Lumen global illumination and reflections, virtual shadow maps and TSR. The chant and organ music, sound effects and ambience are synthesized and play through a cathedral convolution reverb.
 
 ## Requirements
 
-- Windows 10 or 11 and a DirectX 12 GPU with hardware ray tracing (developed on an AMD Radeon RX 6400, 4 GB).
-- Unreal Engine 5.8. The `.bat` launchers expect it in `C:\Program Files\Epic Games\UE_5.8`.
+- Windows 10 or 11 and a DirectX 12 GPU (developed on an AMD Radeon RX 6400, 4 GB).
+- Unreal Engine 5.8. The `.bat` launchers find it through `UE_ROOT`, the Epic Launcher registry entry, a registered source build, or `C:\Program Files\Epic Games\UE_5.8` (see `Tools/FindUE.bat`).
 - Visual Studio 2022 or its Build Tools with the C++ game development workload (built with MSVC 14.44).
 - [Git LFS](https://git-lfs.com): assets, audio, textures and prebuilt libraries are stored in LFS.
 
@@ -25,8 +30,6 @@ Demo recording: [Demo/PuzzleMagic_Demo.mp4](Demo/PuzzleMagic_Demo.mp4)
 git lfs install
 git clone https://github.com/ValhalaStudio/PuzzleMagic.git "D:\Unreal Projects\PuzzleMagic"
 ```
-
-Clone into a short folder like that one. Some files in the FSR plugin have 174-character paths, and Windows limits full paths to 260 characters, so a deeply nested clone fails to check out unless you first run `git config --global core.longpaths true`.
 
 ## Build and run
 
@@ -38,23 +41,19 @@ Open `PuzzleGame5x5.uproject` and let Unreal build the missing modules, or build
 
 | Launcher | What it does |
 |---|---|
-| `PlayGame.bat` | Starts the game in a phone-shaped 440×950 window at the main menu |
-| `RunDemo.bat` | The bot plays Endless while FFmpeg (`C:\ffmpeg\bin\ffmpeg.exe`) records the window to `DemoCapture.mp4` |
-| `RunQuestDemo.bat` | The bot plays through the quest levels from level 1; its results are not saved |
+| `PlayGame.bat` | Starts the game in a 1280×720 landscape window at the main menu |
+| `RunDemo.bat` | The bot plays while FFmpeg (`C:\ffmpeg\bin\ffmpeg.exe`) records the window to `DemoCapture.mp4` |
 
-**Controls**: drag pieces from the tray, and drop one on HOLD to keep it. The relic buttons sit in the bottom corners. **P** switches between bot and manual play, **R** retries, and **Esc** or right-click cancels Holy Light targeting. On Windows, gamepad input goes through SDL3.
+**Controls**: drag pieces from the tray, and drop one on HOLD to keep it. **P** opens the menu (where you take over from the demo bot), **R** retries, and (when the Relics option is on) **Esc** or right-click cancels Holy Light targeting. On Windows, gamepad input goes through SDL3.
 
 ### Command-line options
 
 | Option | Effect |
 |---|---|
-| `-demo` | The bot plays Endless |
-| `-demoquest[=N]` | The bot plays the quest levels from level N (default 1) |
-| `-level=N` | Opens quest level N's intro card |
-| `-tutorial`, `-tutorialpage=N` | Shows the How to play pages over the menu (they open by themselves on first launch), at page N counting from 0. Ignored with `-demo`, `-demoquest` or `-level` |
-| `-omenrate=X` | Fixed omen chance per move, 0 to 1 (the cooldown between omens still applies) |
+| `-demo` | The bot plays |
+| `-grid=WxH` | Board size, each side 4 to 8, for example `-grid=5x7` (default 8×8) |
+| `-tutorial`, `-tutorialpage=N` | Shows the How to play pages over the menu (they open by themselves on first launch), at page N counting from 0. Ignored with `-demo` |
 | `-dread=X` | Keeps the dread effects at least at X, 0 to 1 |
-| `-fsr` | AMD FSR upscaling (Quality) instead of TSR at native resolution; Windows only |
 | `-recordaudio=N` | Records the game's audio mix to `Saved/Recording/demo_audio.wav` for N seconds, then quits |
 
 ## What's where
@@ -63,11 +62,11 @@ Open `PuzzleGame5x5.uproject` and let Unreal build the missing modules, or build
 |---|---|
 | `Source/PuzzleGame5x5` | The game module: rules, board, input, camera, cathedral environment, bot, and the UI (UMG built in C++) |
 | `Source/MeshOptimizer`, `Source/ThirdParty` | meshoptimizer as an engine module; FastNoise2 (prebuilt static libraries) and SDL3 |
-| `Plugins` | RealtimeMeshComponent and AMD FSR |
+| `Plugins` | RealtimeMeshComponent |
 | `Content` | Map, materials, meshes, textures, audio and fonts |
 | `RawAudio`, `RawTextures`, `RawMeshes`, `RawFonts` | Source files that the import scripts read |
-| `Tools` | Python and PowerShell scripts that synthesized the audio, generated the textures, baked the pier mesh in Blender and built assets in the editor. `Tools/ArchitectureDoc` generates `Architecture.html` |
-| `Architecture.html` | Interactive architecture page: class diagram with expandable members, one move traced through the code, the tools and libraries used, and why the board is 9×9 rather than 8×8 |
+| `Tools` | Python and PowerShell scripts that synthesized the audio, generated the textures, baked the pier mesh in Blender and built assets in the editor (for example `build_route_tiles.py` and `build_bonus_tiles.py` make the tile materials). `Tools/ArchitectureDoc` generates `Architecture.html` |
+| `Architecture.html` | Interactive architecture page: class diagram with expandable members, one move traced through the code, the tools and libraries used, and the board sizes |
 
 GitHub shows `Architecture.html` as source code. Open it in a browser from a clone, or download it first.
 
@@ -76,7 +75,6 @@ GitHub shows `Architecture.html` as source code. Open it in a browser from a clo
 | Component | Version | License |
 |---|---|---|
 | RealtimeMeshComponent | 5.4 | MIT |
-| AMD FSR plugin | 4.1.1 | MIT; the FidelityFX SDK binaries are under AMD's license (`Plugins/FSR/Source/fidelityfx-sdk/Kits/FidelityFX/docs/license.md`) |
 | SDL3 | 3.4.16 | zlib |
 | meshoptimizer | 1.3 | MIT |
 | FastNoise2 | 1.1.1 | MIT |

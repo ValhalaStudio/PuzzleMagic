@@ -8,6 +8,7 @@
 #include "PuzzleHUDWidget.generated.h"
 
 class UCanvasPanel;
+class UCanvasPanelSlot;
 class UOverlay;
 class UVerticalBox;
 class UHorizontalBox;
@@ -26,11 +27,11 @@ enum class EPuzzleCard : uint8
 {
 	None,
 	Menu,
-	LevelIntro,
-	LevelComplete,
-	LevelFailed,
-	EndlessOver,
-	Tutorial
+	GameOver,
+	Tutorial,
+	Pause,
+	Courses,
+	Options
 };
 
 // Buttons never take keyboard focus, so game keys keep reaching the player controller after a click.
@@ -74,8 +75,7 @@ public:
 	void ShowClear(const FPuzzleClearEvent& Event);
 	void ShowComboBroken(int32 LostCombo);
 	void ShowRelicGained(ERelic Relic);
-	void ShowStoneLanded(const FVector& WorldLocation);
-	void ShowOmen(EOmen Omen, bool bWarded, const FVector& WorldLocation);
+	void ShowBonusSpawned(const FVector& WorldLocation);
 	void ResetRound();
 
 	// The "How to play" pages, from Page (0-based).
@@ -89,7 +89,12 @@ protected:
 
 private:
 	// ActTutorial's Param is the page to show; -1 closes the tutorial.
-	enum EAction : int32 { ActEndless, ActLevel, ActBegin, ActNext, ActRetry, ActMenu, ActHoly, ActReroll, ActDemo, ActHowTo, ActTutorial };
+	enum EAction : int32
+	{
+		ActPlay, ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
+		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus,
+		ActCourse   // Param = width * 10 + height
+	};
 
 	void BuildTutorialPage();
 	int32 TutorialPage = 0;
@@ -103,10 +108,11 @@ private:
 	UButton* MakeButton(UWidget* Content, const FVector2D& Size, const FLinearColor& Fill, const FLinearColor& Fill2, int32 Action, int32 Param = 0);
 	UButton* MakeTextButton(const FString& Label, const FVector2D& Size, const FLinearColor& Fill, const FLinearColor& Fill2, int32 Action, int32 Param = 0);
 	UWidget* Sized(UWidget* Content, const FVector2D& Size);
-	UWidget* StarRow(int32 Stars, float Size, float Gap);
 
 	void BuildHUD();
 	void BuildCardContent(EPuzzleCard Card);
+	// Rebuilds the open card in place (no entrance animation), for buttons that change their own label.
+	void RefreshCard();
 
 	// --- Popups ---
 	struct FPopup
@@ -141,11 +147,13 @@ private:
 	UPROPERTY() TObjectPtr<UCanvasPanel> RootCanvas;
 	UPROPERTY() TObjectPtr<UCanvasPanel> PopupLayer;
 	UPROPERTY() TObjectPtr<UImage> TopBarBg;
+	UPROPERTY() TObjectPtr<UCanvasPanelSlot> TopBarSlot;
+	UPROPERTY() TObjectPtr<UCanvasPanelSlot> HintSlot;
+	// Where the combo badge hangs (between the candles), as a fraction of the canvas; combo popups use it too.
+	FVector2D ComboAnchorFraction = FVector2D(0.5f, 0.14f);
 	UPROPERTY() TObjectPtr<UTextBlock> MovesText;
 	UPROPERTY() TObjectPtr<UTextBlock> ScoreText;
-	UPROPERTY() TObjectPtr<UTextBlock> GoalLabel;
-	UPROPERTY() TObjectPtr<UTextBlock> GoalText;
-	UPROPERTY() TObjectPtr<UImage> GoalIcon;
+	UPROPERTY() TObjectPtr<UTextBlock> BestText;
 	UPROPERTY() TObjectPtr<UWidget> ComboBadge;
 	UPROPERTY() TObjectPtr<UImage> ComboBg;
 	UPROPERTY() TObjectPtr<UTextBlock> ComboText;
@@ -182,6 +190,9 @@ private:
 	int32 LastLuck = -1;
 	float LuckPop = 0.f;
 	float DisplayedLuck = 0.f;
-	FVector2D CanvasSize = FVector2D(1080.f, 2340.f);
+	// The score and best texts shrink as their numbers get longer, so they stay inside the panel.
+	float ScoreFontSize = 0.f;
+	float BestFontSize = 0.f;
+	FVector2D CanvasSize = FVector2D(1920.f, 1080.f);
 	float Time = 0.f;
 };
