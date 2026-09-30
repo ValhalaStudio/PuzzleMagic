@@ -79,6 +79,39 @@ void APuzzleFX::AddRing(const FVector& Center, float Radius, const FLinearColor&
 	P.Intensity = 2.5f;
 }
 
+void APuzzleFX::AddStream(const TArray<FVector>& Points, const FLinearColor& Color, float Delay, float Speed)
+{
+	if (Points.Num() < 2 || Speed <= 0.f)
+	{
+		return;
+	}
+	FStream NewStream;
+	NewStream.Points = Points;
+	NewStream.Cumulative.Add(0.f);
+	for (int32 I = 1; I < Points.Num(); ++I)
+	{
+		NewStream.Cumulative.Add(NewStream.Cumulative.Last() + FVector::Dist(Points[I - 1], Points[I]));
+	}
+	const float Total = NewStream.Cumulative.Last();
+	if (Total < 1.f)
+	{
+		return;
+	}
+	const int32 StreamIndex = Streams.Add(MoveTemp(NewStream));
+
+	// Droplets leave the start one after another, each running the whole path: a continuous flow.
+	const float Life = Total / Speed;
+	const float Gap = 0.05f;
+	const int32 Drops = FMath::Clamp(FMath::CeilToInt(Life / Gap) + 4, 6, 70);
+	for (int32 I = 0; I < Drops; ++I)
+	{
+		FParticle& P = AddQuad(EKind::Drop, Points[0], Color, ShapeStrip, Delay + I * Gap, Life);
+		P.Stream = StreamIndex;
+		P.BaseScale = FVector2D(0.95f, 0.5f);
+		P.Intensity = 3.2f;
+	}
+}
+
 void APuzzleFX::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -118,6 +151,23 @@ void APuzzleFX::Tick(float DeltaTime)
 			Intensity *= 1.f - T;
 			Scale *= 0.3f + 1.1f * FMath::Sqrt(T);
 			break;
+		case EKind::Drop:
+		{
+			const FStream& Path = Streams[P.Stream];
+			const float Distance = T * Path.Cumulative.Last();
+			int32 Segment = 1;
+			while (Segment < Path.Cumulative.Num() - 1 && Path.Cumulative[Segment] < Distance)
+			{
+				++Segment;
+			}
+			const float SegmentLength = FMath::Max(Path.Cumulative[Segment] - Path.Cumulative[Segment - 1], 0.01f);
+			const float Along = FMath::Clamp((Distance - Path.Cumulative[Segment - 1]) / SegmentLength, 0.f, 1.f);
+			const FVector Heading = Path.Points[Segment] - Path.Points[Segment - 1];
+			P.Mesh->SetWorldLocation(FMath::Lerp(Path.Points[Segment - 1], Path.Points[Segment], Along));
+			P.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Heading.Y, Heading.X));
+			Intensity *= FMath::Min(1.f, T * 6.f) * FMath::Min(1.f, (1.f - T) * 6.f);
+			break;
+		}
 		}
 
 		P.Mesh->SetWorldRotation(FRotator(0.f, P.Yaw, 0.f));

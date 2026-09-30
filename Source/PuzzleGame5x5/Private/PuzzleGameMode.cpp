@@ -9,6 +9,7 @@
 #include "PuzzleFX.h"
 #include "PuzzleSaveGame.h"
 #include "GothicEnvironment.h"
+#include "HalloweenProps.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 #include "Sound/SoundBase.h"
@@ -77,6 +78,7 @@ void APuzzleGameMode::StartPlay()
 		GridManager = GetWorld()->SpawnActor<AGridManager>(GridManagerClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 		InputHandler = GetWorld()->SpawnActor<APuzzleInputHandler>(InputHandlerClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 		Environment = GetWorld()->SpawnActor<AGothicEnvironment>(AGothicEnvironment::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		GetWorld()->SpawnActor<AHalloweenProps>(AHalloweenProps::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 	}
 
 	if (GridManager)

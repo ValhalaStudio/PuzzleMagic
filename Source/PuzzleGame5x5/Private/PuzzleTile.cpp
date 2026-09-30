@@ -93,6 +93,7 @@ void APuzzleTile::SetDirection(EPuzzleDir NewDir)
 void APuzzleTile::SetBonus(EPuzzleBonus NewBonus)
 {
 	Bonus = NewBonus;
+	BonusFill = Bonus == EPuzzleBonus::Outgoing ? 1.f : 0.f;
 	if (Bonus != EPuzzleBonus::None)
 	{
 		// Loaded when needed, not from the constructor, so the asset can be rebuilt by the editor script.
@@ -126,12 +127,13 @@ void APuzzleTile::ApplyVisualState()
 	{
 		return;
 	}
-	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Bonus != EPuzzleBonus::None ? PuzzleTypes::BonusToColor(Bonus) : PuzzleTypes::ToLinearColor(TileColor));
-	DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), Bonus != EPuzzleBonus::None ? 1.f : 0.f);
+	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Bonus != EPuzzleBonus::None ? PuzzleTypes::BonusBaseColor(Bonus) : PuzzleTypes::ToLinearColor(TileColor));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), Bonus != EPuzzleBonus::None ? 0.35f : 0.f);
 	const bool bIsBonus = Bonus != EPuzzleBonus::None;
 	// Bonus tiles point nowhere and carry no sigil; their emblem (if any) tells the kind.
 	DynamicMaterial->SetScalarParameterValue(TEXT("Symbol"), bIsBonus ? -1.f : static_cast<float>(TileColor));
-	DynamicMaterial->SetScalarParameterValue(TEXT("Emblem"), Bonus == EPuzzleBonus::Outgoing ? 1.f : (Bonus == EPuzzleBonus::Incoming ? 2.f : 0.f));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Emblem"), Bonus == EPuzzleBonus::Basic ? 2.f : (bIsBonus ? 1.f : 0.f));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Fill"), BonusFill);
 	DynamicMaterial->SetScalarParameterValue(TEXT("Direction"), (bHasDirection && !bIsBonus) ? static_cast<float>(TileDirection) : -1.f);
 	DynamicMaterial->SetScalarParameterValue(TEXT("Glow"), CurrentGlow);
 }
@@ -202,6 +204,22 @@ void APuzzleTile::PlayClearEffectAndDestroy(float Delay, float InLaunchStrength)
 	SetActorTickEnabled(true);
 }
 
+void APuzzleTile::PlayBonusClear(float Delay, float InLaunchStrength)
+{
+	if (Anim == EAnim::Arriving || Anim == EAnim::Squash)
+	{
+		SetActorLocation(ArriveTo);
+		SetActorScale3D(FVector(RestScale));
+	}
+	RestScale = GetActorScale3D().X;
+	BonusRestLocation = GetActorLocation();
+	LaunchStrength = InLaunchStrength;
+	AnimDelay = Delay;
+	AnimTime = 0.f;
+	Anim = EAnim::BonusPre;
+	SetActorTickEnabled(true);
+}
+
 void APuzzleTile::Launch()
 {
 	SetActorScale3D(FVector(RestScale));
@@ -264,6 +282,35 @@ void APuzzleTile::Tick(float DeltaTime)
 			SetActorLocation(ArriveTo);
 			Anim = EAnim::None;
 			SetActorTickEnabled(false);
+		}
+		break;
+	}
+	case EAnim::BonusPre:
+	{
+		constexpr float PreDuration = 0.9f;
+		const float U = FMath::Min(AnimTime / PreDuration, 1.f);
+		if (Bonus == EPuzzleBonus::Basic)
+		{
+			// The pumpkin swells and shakes, glowing from inside, before it bursts.
+			SetActorScale3D(FVector(RestScale * (1.f + 0.4f * U * U)));
+			SetActorLocation(BonusRestLocation + FVector(FMath::Sin(AnimTime * 70.f) * 5.f * U, 0.f, 0.f));
+			SetGlow(1.8f * U * U);
+		}
+		else
+		{
+			BonusFill = Bonus == EPuzzleBonus::Outgoing ? 1.f - U : U;
+			if (DynamicMaterial)
+			{
+				DynamicMaterial->SetScalarParameterValue(TEXT("Fill"), BonusFill);
+			}
+			SetGlow(0.7f * U);
+		}
+		if (U >= 1.f)
+		{
+			SetActorLocation(BonusRestLocation);
+			SetActorScale3D(FVector(RestScale));
+			Anim = EAnim::ClearPending;
+			AnimTime = 0.f;
 		}
 		break;
 	}

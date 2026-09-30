@@ -75,8 +75,7 @@ namespace PieceLibrary
 	inline FPuzzlePieceShape MakeRandomPieceRandomColor()
 	{
 		static const TArray<EPuzzleTileColor> Palette = {
-			EPuzzleTileColor::Red, EPuzzleTileColor::Green, EPuzzleTileColor::Blue,
-			EPuzzleTileColor::Yellow, EPuzzleTileColor::Purple
+			EPuzzleTileColor::Black, EPuzzleTileColor::Purple, EPuzzleTileColor::Red, EPuzzleTileColor::Ash
 		};
 		return MakeRandomPiece(Palette[FMath::RandRange(0, Palette.Num() - 1)]);
 	}

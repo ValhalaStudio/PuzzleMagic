@@ -178,7 +178,8 @@ private:
 
 	void BuildBoardVisuals();
 	APuzzleTile* SpawnTile(const FVector& BaseLocation, EPuzzleTileColor Color, EPuzzleDir Dir, float Scale);
-	void PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, class APuzzleFX* FX);
+	// FlowDelay (optional) gives cells of a route the delay at which the stream reaches them; the rest ripple out from Centre.
+	void PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, class APuzzleFX* FX, const TMap<int32, float>* FlowDelay = nullptr);
 
 	UPROPERTY()
 	TArray<TObjectPtr<APuzzleTile>> TrayVisuals;

@@ -734,8 +734,8 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	{
 		Pages.Add({ TEXT("Bonus Tiles"),
 		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
-		  TEXT("Glowing tiles without an arrow appear as your score grows: a plain BASIC one every 1000 points, an OUT (diamond) and an IN (eye) pair every 10000. There are never more than 2 BASIC tiles, or 1 OUT or 1 IN, on the board.\n\n")
-		  TEXT("BASIC clears when a chain of arrows joins it to a side. OUT sends a chain out through any neighbour and clears when the chain leaves the board. IN takes a chain arriving from any side, starting at a side. A chain from OUT to IN is worth 1000.") });
+		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 1000 points, and a full potion (OUT) with an empty potion (IN) every 10000. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
+		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A chain from the full potion to the empty one is worth 1000.") });
 	}
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{

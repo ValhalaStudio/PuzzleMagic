@@ -18,14 +18,13 @@ enum class EPuzzleGamepadButton : uint8
 UENUM(BlueprintType)
 enum class EPuzzleTileColor : uint8
 {
+	Black,
+	Purple,
 	Red,
-	Green,
-	Blue,
-	Yellow,
-	Purple
+	Ash
 };
 
-static constexpr int32 PuzzleColorCount = 5;
+static constexpr int32 PuzzleColorCount = 4;
 
 // The way a tile's triangle points, and so the way a route flows through it. Grid space has +Y up.
 UENUM(BlueprintType)
@@ -87,15 +86,22 @@ struct FPuzzlePieceShape
 
 namespace PuzzleTypes
 {
+	// The colour of a bonus kind's effects and popups: pumpkin orange, potion magenta.
 	inline FLinearColor BonusToColor(EPuzzleBonus Kind)
 	{
 		switch (Kind)
 		{
-		case EPuzzleBonus::Basic:    return FLinearColor(1.00f, 0.93f, 0.55f);
-		case EPuzzleBonus::Outgoing: return FLinearColor(0.10f, 0.85f, 1.00f);
-		case EPuzzleBonus::Incoming: return FLinearColor(1.00f, 0.25f, 0.70f);
+		case EPuzzleBonus::Basic:    return FLinearColor(1.00f, 0.45f, 0.05f);
+		case EPuzzleBonus::Outgoing:
+		case EPuzzleBonus::Incoming: return FLinearColor(1.00f, 0.08f, 0.78f);
 		default:                     return FLinearColor::White;
 		}
+	}
+
+	// The dark enamel a bonus tile's emblem sits on.
+	inline FLinearColor BonusBaseColor(EPuzzleBonus Kind)
+	{
+		return Kind == EPuzzleBonus::Basic ? FLinearColor(0.05f, 0.03f, 0.02f) : FLinearColor(0.10f, 0.03f, 0.16f);
 	}
 
 	inline FIntPoint DirToOffset(EPuzzleDir Dir)
@@ -122,11 +128,10 @@ namespace PuzzleTypes
 	{
 		switch (Color)
 		{
-		case EPuzzleTileColor::Red:    return FLinearColor(0.90f, 0.10f, 0.14f);
-		case EPuzzleTileColor::Green:  return FLinearColor(0.16f, 0.66f, 0.18f);
-		case EPuzzleTileColor::Blue:   return FLinearColor(0.12f, 0.38f, 0.95f);
-		case EPuzzleTileColor::Yellow: return FLinearColor(1.00f, 0.66f, 0.06f);
-		case EPuzzleTileColor::Purple: return FLinearColor(0.52f, 0.16f, 0.88f);
+		case EPuzzleTileColor::Black:  return FLinearColor(0.025f, 0.025f, 0.03f);
+		case EPuzzleTileColor::Purple: return FLinearColor(0.42f, 0.10f, 0.78f);
+		case EPuzzleTileColor::Red:    return FLinearColor(0.90f, 0.08f, 0.10f);
+		case EPuzzleTileColor::Ash:    return FLinearColor(0.20f, 0.21f, 0.24f);
 		default:                       return FLinearColor::White;
 		}
 	}
