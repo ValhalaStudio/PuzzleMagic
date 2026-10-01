@@ -44,23 +44,25 @@ public:
 	static constexpr int32 MaxRelicCharges = 3;
 	static constexpr int32 StartingMovesCount = 30;
 
-	// A route earns 10^n bonus points (5^n between neighbouring sides), n being its tiles beyond the basic
-	// length. The bonus of one route never goes above this.
-	static constexpr int32 MaxRouteBonus = 100000;
+	// Scoring: a cleared route is worth 10 and each tile of its sequence 2, with no exponents. Routes that share
+	// tiles each earn 5 more for every route cleared at the same time.
+	static constexpr int32 RoutePoints = 10;
+	static constexpr int32 RouteTilePoints = 2;
+	static constexpr int32 SharedRoutePoints = 5;
 
-	// Bonus tiles (Play options > Bonus tiles): a basic one every 1000 points, an outgoing/incoming pair every 10000.
-	// A cleared basic tile scores 50, a directional one 250, each plus 10^n for n chain tiles beyond the straight
-	// line to the nearest side; an outgoing tile linked to an incoming one scores 1000. A bonus tile has no arrow:
-	// an outgoing one (a diamond) sends a chain out through any neighbour, an incoming one (a fisheye) takes a chain
-	// arriving from any side, and a basic one (plain) does both.
-	static constexpr int32 BasicBonusEvery = 1000;
-	static constexpr int32 PairBonusEvery = 10000;
+	// Bonus tiles (Play options > Bonus tiles): a pumpkin every 200 points, an outgoing/incoming bottle pair every 600.
+	// A cleared pumpkin scores 25, a bottle on its own 50, each plus 2 for every tile of its chain; an outgoing bottle
+	// linked to an incoming one scores a flat 100. A bonus tile has no arrow: an outgoing bottle sends a chain out
+	// through any neighbour, an incoming one takes a chain arriving from any side, and a pumpkin does both.
+	static constexpr int32 BasicBonusEvery = 200;
+	static constexpr int32 PairBonusEvery = 600;
 	// At most this many of each kind are ever on the board at once.
 	static constexpr int32 MaxBasicBonusTiles = 2;
 	static constexpr int32 MaxDirectionalBonusTiles = 1;
-	static constexpr int32 BasicBonusPoints = 50;
-	static constexpr int32 DirectionalBonusPoints = 250;
-	static constexpr int32 LinkedBonusPoints = 1000;
+	static constexpr int32 BasicBonusPoints = 25;
+	static constexpr int32 DirectionalBonusPoints = 50;
+	static constexpr int32 LinkedBonusPoints = 100;
+	static constexpr int32 BonusChainTilePoints = 2;
 
 	// Luck (0-100): gathered by growing a combo, spent by using relics (the combo's rewards).
 	static constexpr int32 MaxLuck = 100;
@@ -134,9 +136,10 @@ private:
 	int32 NextPairBonusScore = PairBonusEvery;
 
 	void AddLuck(int32 Delta);
-	static int32 RouteBonus(const FRouteInfo& Route);
+	// The points of the routes cleared together: 10 per route and 2 per tile of its sequence, plus 5 per route
+	// cleared at once for each route that shares tiles with another.
+	static int32 RoutesPoints(const TArray<FRouteInfo>& Routes);
 	static int32 BonusPoints(const FBonusEvent& Event);
-	static int32 PowerBonus(int32 ExtraTiles, int32 Base);
 	void SpawnDueBonusTiles();
 	void GrantRelics();
 	void CheckForEnd();

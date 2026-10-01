@@ -433,7 +433,7 @@ bool AGridManager::IsRouteEnder(int32 X, int32 Y, EPuzzleDir Dir) const
 	}
 }
 
-void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells) const
+void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells, int32* OutCircuitCount) const
 {
 	OutRoutes.Reset();
 	OutCircuitCells.Reset();
@@ -594,6 +594,38 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		{
 			OutCircuitCells.Add(Index);
 		}
+	}
+
+	// Circuit cells that point at one another are one circuit (a loop with a tail feeding it counts once).
+	if (OutCircuitCount)
+	{
+		TMap<int32, int32> Parent;
+		for (int32 Index : OutCircuitCells)
+		{
+			Parent.Add(Index, Index);
+		}
+		auto Find = [&](int32 Index)
+		{
+			while (Parent[Index] != Index)
+			{
+				Index = Parent[Index];
+			}
+			return Index;
+		};
+		for (int32 Index : OutCircuitCells)
+		{
+			const int32 Target = Next(Index);
+			if (Target >= 0 && Parent.Contains(Target))
+			{
+				Parent[Find(Index)] = Find(Target);
+			}
+		}
+		TSet<int32> Roots;
+		for (int32 Index : OutCircuitCells)
+		{
+			Roots.Add(Find(Index));
+		}
+		*OutCircuitCount = Roots.Num();
 	}
 }
 
@@ -886,20 +918,36 @@ int32 AGridManager::CountBonusTiles(EPuzzleBonus Kind) const
 
 bool AGridManager::SpawnBonusTile(EPuzzleBonus Kind, FIntPoint& OutCell)
 {
-	TArray<int32> Empty;
-	for (int32 Index = 0; Index < Filled.Num(); ++Index)
+	// Try every empty cell with the tile in it. A cell is out if the board would be stuck afterwards (no game
+	// over by spawning); of the rest, one where the tile does not score straight away is picked at random, and
+	// a scoring one only when there is no other.
+	TArray<int32> Quiet;
+	TArray<int32> Scoring;
+	for (int32 Candidate = 0; Candidate < Filled.Num(); ++Candidate)
 	{
-		if (!Filled[Index])
+		if (Filled[Candidate])
 		{
-			Empty.Add(Index);
+			continue;
+		}
+		Filled[Candidate] = true;
+		CellBonus[Candidate] = static_cast<uint8>(Kind);
+		const bool bStuck = !CanAnyTrayPieceFit();
+		TArray<FBonusEvent> Events;
+		FindBonusEvents(Events);
+		Filled[Candidate] = false;
+		CellBonus[Candidate] = 0;
+		if (!bStuck)
+		{
+			(Events.Num() == 0 ? Quiet : Scoring).Add(Candidate);
 		}
 	}
-	if (Empty.Num() == 0)
+	const TArray<int32>& Choices = Quiet.Num() > 0 ? Quiet : Scoring;
+	if (Choices.Num() == 0)
 	{
 		return false;
 	}
 
-	const int32 Index = Empty[FMath::RandRange(0, Empty.Num() - 1)];
+	const int32 Index = Choices[FMath::RandRange(0, Choices.Num() - 1)];
 	const int32 X = Index % GridWidth;
 	const int32 Y = Index / GridWidth;
 	OutCell = FIntPoint(X, Y);
@@ -924,7 +972,8 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 	FClearResult Result;
 	TArray<FRouteInfo> Routes;
 	TArray<int32> Circuits;
-	FindRoutes(Filled, CellDirs, Routes, Circuits);
+	int32 CircuitCount = 0;
+	FindRoutes(Filled, CellDirs, Routes, Circuits, &CircuitCount);
 	TArray<FBonusEvent> Bonuses;
 	FindBonusEvents(Bonuses);
 
@@ -949,6 +998,7 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 	}
 	Result.Cells = RouteCells.Num();
 	Result.CircuitCells = Circuits.Num();
+	Result.Circuits = CircuitCount;
 
 	FVector2D CentroidCell = FVector2D::ZeroVector;
 	for (int32 Index : CellsToClear)
@@ -1200,12 +1250,11 @@ void AGridManager::ConsumeTraySlot(int32 SlotIndex)
 
 void AGridManager::RerollTray()
 {
+	// A full refresh: all three tray slots get new pieces, however many were still unplayed (the hold slot is kept).
 	for (int32 SlotIndex = 0; SlotIndex < TraySize; ++SlotIndex)
 	{
-		if (!TraySlotUsed[SlotIndex])
-		{
-			Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
-		}
+		Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
+		TraySlotUsed[SlotIndex] = false;
 	}
 	RefreshTrayVisuals();
 
