@@ -3,7 +3,6 @@
 #include "PuzzleManager.h"
 #include "PuzzleInputHandler.h"
 #include "PuzzleSaveGame.h"
-#include "QuestCatalog.h"
 #include "GridManager.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
@@ -16,10 +15,9 @@
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
-#include "Components/UniformGridPanel.h"
-#include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Fonts/CompositeFont.h"
@@ -54,10 +52,8 @@ namespace UIStyle
 
 	// Icon shapes in M_UIIcon.
 	constexpr float IconMoon = 2.f;
-	constexpr float IconGargoyle = 5.f;
 	constexpr float IconSun = 6.f;
 	constexpr float IconReroll = 7.f;
-	constexpr float IconBox = 8.f;
 	constexpr float IconLine = 9.f;
 	constexpr float IconStar = 10.f;
 
@@ -201,22 +197,6 @@ UButton* UPuzzleHUDWidget::MakeTextButton(const FString& Label, const FVector2D&
 	return MakeButton(MakeText(Label, false, Size.Y * 0.36f, FLinearColor::White, 4.f), Size, Fill, Fill2, Action, Param);
 }
 
-UWidget* UPuzzleHUDWidget::StarRow(int32 Stars, float Size, float Gap)
-{
-	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
-	for (int32 Index = 0; Index < 3; ++Index)
-	{
-		const bool bEarned = Index < Stars;
-		UImage* Star = MakeIcon(UIStyle::IconStar, bEarned ? UIStyle::Gold : FLinearColor(0.3f, 0.22f, 0.35f), Size, bEarned ? 1.f : 0.f, bEarned ? 0.4f : 0.f);
-		if (UHorizontalBoxSlot* RowSlot = Row->AddChildToHorizontalBox(Star))
-		{
-			RowSlot->SetPadding(FMargin(Gap, 0.f));
-			RowSlot->SetVerticalAlignment(VAlign_Center);
-		}
-	}
-	return Row;
-}
-
 // --- Construction ------------------------------------------------------------------
 
 void UPuzzleHUDWidget::NativeOnInitialized()
@@ -243,7 +223,7 @@ void UPuzzleHUDWidget::BuildHUD()
 	RootCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	WidgetTree->RootWidget = RootCanvas;
 
-	// ---- Top bar: MOVES | SCORE | GOAL ----
+	// ---- Top bar: MOVES | SCORE | BEST ----
 	UOverlay* TopBar = WidgetTree->ConstructWidget<UOverlay>();
 	TopBar->SetVisibility(ESlateVisibility::HitTestInvisible);
 	TopBarBg = MakePanel(PanelFill, PanelFill2, Rim, 5.f, 0.22f);
@@ -268,22 +248,16 @@ void UPuzzleHUDWidget::BuildHUD()
 	};
 
 	MovesText = MakeText(TEXT("30"), false, 64.f, Cyan, 5.f);
-	AddColumn(MakeText(TEXT("MOVES"), true, 22.f, Lavender, 3.f), MovesText, 1.f);
+	if (UPuzzleManager::bMoveBudgetEnabled)
+	{
+		AddColumn(MakeText(TEXT("MOVES"), true, 22.f, Lavender, 3.f), MovesText, 1.f);
+	}
 
 	ScoreText = MakeText(TEXT("0"), false, 74.f, Gold, 5.f);
 	AddColumn(MakeText(TEXT("SCORE"), true, 24.f, PaleGold, 3.f), ScoreText, 1.35f);
 
-	UHorizontalBox* GoalRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	GoalIcon = MakeIcon(IconStar, Gold, 62.f);
-	GoalRow->AddChildToHorizontalBox(GoalIcon)->SetVerticalAlignment(VAlign_Center);
-	GoalText = MakeText(TEXT("0"), false, 52.f, FLinearColor::White, 5.f);
-	if (UHorizontalBoxSlot* GoalSlot = GoalRow->AddChildToHorizontalBox(GoalText))
-	{
-		GoalSlot->SetVerticalAlignment(VAlign_Center);
-		GoalSlot->SetPadding(FMargin(8.f, 0.f, 0.f, 0.f));
-	}
-	GoalLabel = MakeText(TEXT("GOAL"), true, 22.f, Lavender, 3.f);
-	AddColumn(GoalLabel, GoalRow, 1.f);
+	BestText = MakeText(TEXT("0"), false, 52.f, FLinearColor::White, 5.f);
+	AddColumn(MakeText(TEXT("BEST"), true, 22.f, Lavender, 3.f), BestText, 1.f);
 
 	if (UOverlaySlot* ColumnsSlot = TopBar->AddChildToOverlay(Columns))
 	{
@@ -292,28 +266,31 @@ void UPuzzleHUDWidget::BuildHUD()
 		ColumnsSlot->SetPadding(FMargin(30.f, 0.f, 30.f, 8.f));
 	}
 
-	UCanvasPanelSlot* TopSlot = RootCanvas->AddChildToCanvas(TopBar);
-	TopSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 0.f));
-	TopSlot->SetOffsets(FMargin(22.f, 36.f, 22.f, 210.f));
+	TopBarSlot = RootCanvas->AddChildToCanvas(TopBar);
+	// Landscape: a compact score panel in the top-right corner.
+	TopBarSlot->SetAnchors(FAnchors(1.f, 0.f));
+	TopBarSlot->SetAlignment(FVector2D(1.f, 0.f));
+	TopBarSlot->SetPosition(FVector2D(-22.f, 36.f));
+	TopBarSlot->SetSize(FVector2D(560.f, 174.f));
 
 	// ---- Combo meter: "COMBO x5" and three pips = placements left to keep it alive ----
 	UOverlay* Combo = WidgetTree->ConstructWidget<UOverlay>();
 	Combo->SetVisibility(ESlateVisibility::HitTestInvisible);
-	ComboBg = MakePanel(FLinearColor(0.4f, 0.03f, 0.3f), FLinearColor(0.1f, 0.005f, 0.09f), Rim, 480.f / 124.f, 0.45f, 0.3f);
+	ComboBg = MakePanel(FLinearColor(0.4f, 0.03f, 0.3f), FLinearColor(0.1f, 0.005f, 0.09f), Rim, 330.f / 92.f, 0.45f, 0.3f);
 	if (UOverlaySlot* BgSlot = Combo->AddChildToOverlay(ComboBg))
 	{
 		BgSlot->SetHorizontalAlignment(HAlign_Fill);
 		BgSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 	UHorizontalBox* ComboRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	ComboText = MakeText(TEXT("COMBO x1"), false, 46.f, FLinearColor(1.f, 0.75f, 0.95f), 4.f);
+	ComboText = MakeText(TEXT("COMBO x1"), false, 34.f, FLinearColor(1.f, 0.75f, 0.95f), 3.f);
 	ComboRow->AddChildToHorizontalBox(ComboText)->SetVerticalAlignment(VAlign_Center);
 	for (int32 Pip = 0; Pip < UPuzzleManager::ComboWindowMoves; ++Pip)
 	{
-		UImage* PipImage = MakeIcon(IconStar, PaleGold, 42.f, 1.f, 0.4f);
+		UImage* PipImage = MakeIcon(IconStar, PaleGold, 30.f, 1.f, 0.4f);
 		UHorizontalBoxSlot* PipSlot = ComboRow->AddChildToHorizontalBox(PipImage);
 		PipSlot->SetVerticalAlignment(VAlign_Center);
-		PipSlot->SetPadding(FMargin(Pip == 0 ? 16.f : 2.f, 0.f, 0.f, 0.f));
+		PipSlot->SetPadding(FMargin(Pip == 0 ? 10.f : 2.f, 0.f, 0.f, 0.f));
 		ComboPips.Add(PipImage);
 	}
 	if (UOverlaySlot* RowSlot = Combo->AddChildToOverlay(ComboRow))
@@ -325,21 +302,22 @@ void UPuzzleHUDWidget::BuildHUD()
 	ComboBadge = Combo;
 	Combo->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 	UCanvasPanelSlot* ComboSlot = RootCanvas->AddChildToCanvas(Combo);
-	ComboSlot->SetAnchors(FAnchors(0.5f, 0.f));
-	ComboSlot->SetAlignment(FVector2D(0.5f, 0.f));
-	ComboSlot->SetPosition(FVector2D(0.f, 250.f));
-	ComboSlot->SetSize(FVector2D(480.f, 124.f));
+	// Hangs at the top of the scene between the two candle clusters, clear of the board (placed every frame).
+	ComboSlot->SetAnchors(FAnchors(0.f, 0.f));
+	ComboSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+	ComboSlot->SetPosition(FVector2D(960.f, 150.f));
+	ComboSlot->SetSize(FVector2D(330.f, 92.f));
 
-	// ---- Menu pill (top-left, under the bar) ----
-	UButton* Menu = MakeTextButton(TEXT("MENU"), FVector2D(170.f, 84.f), Amethyst, Amethyst2, ActMenu);
+	// ---- Menu pill (top-left) ----
+	UButton* Menu = MakeTextButton(TEXT("MENU"), FVector2D(170.f, 84.f), Amethyst, Amethyst2, ActPause);
 	MenuButton = Menu;
 	UCanvasPanelSlot* MenuSlot = RootCanvas->AddChildToCanvas(Menu);
 	MenuSlot->SetAnchors(FAnchors(0.f, 0.f));
-	MenuSlot->SetPosition(FVector2D(34.f, 256.f));
+	MenuSlot->SetPosition(FVector2D(34.f, 36.f));
 	MenuSlot->SetSize(FVector2D(170.f, 84.f));
 
 	// ---- Luck (top-right, under the bar): the moon's favour. Combos raise it, relics spend it,
-	// and it is the chance of warding off the next storm or hex. ----
+	// and it lights the candles. ----
 	UOverlay* Luck = WidgetTree->ConstructWidget<UOverlay>();
 	Luck->SetVisibility(ESlateVisibility::HitTestInvisible);
 	LuckBg = MakePanel(Emerald, Emerald2, Rim, 250.f / 96.f, 0.45f, 0.2f);
@@ -452,11 +430,13 @@ void UPuzzleHUDWidget::BuildHUD()
 	HintText = MakeText(TEXT(""), false, 30.f, Lavender, 3.f);
 	HintText->SetAutoWrapText(true);
 	HintText->SetVisibility(ESlateVisibility::HitTestInvisible);
-	UCanvasPanelSlot* HintSlot = RootCanvas->AddChildToCanvas(HintText);
-	HintSlot->SetAnchors(FAnchors(0.5f, 1.f));
-	HintSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-	HintSlot->SetPosition(FVector2D(0.f, -140.f));
-	HintSlot->SetSize(FVector2D(620.f, 110.f));
+	HintSlot = RootCanvas->AddChildToCanvas(HintText);
+	// Top-left, under the MENU pill, so it is never over the tray.
+	HintText->SetJustification(ETextJustify::Left);
+	HintSlot->SetAnchors(FAnchors(0.f, 0.f));
+	HintSlot->SetAlignment(FVector2D(0.f, 0.f));
+	HintSlot->SetPosition(FVector2D(34.f, 150.f));
+	HintSlot->SetSize(FVector2D(480.f, 130.f));
 
 	// ---- "HOLD" label, projected under the reserve slot each frame ----
 	HoldLabel = MakeText(TEXT("HOLD"), true, 26.f, FLinearColor(0.75f, 0.55f, 1.f), 3.f);
@@ -496,14 +476,21 @@ void UPuzzleHUDWidget::BuildHUD()
 	if (UOverlaySlot* ContentSlot = Card->AddChildToOverlay(CardContent))
 	{
 		ContentSlot->SetHorizontalAlignment(HAlign_Fill);
-		ContentSlot->SetPadding(FMargin(70.f, 90.f, 70.f, 100.f));
+		// The panel shader draws its frame and glow about 47 units inside the card, so the padding is that much deeper.
+		ContentSlot->SetPadding(FMargin(100.f, 135.f, 100.f, 145.f));   // 740 units of the 940-wide card are usable
 	}
 	CardPanel = Sized(Card, FVector2D(940.f, 0.f));
 	CardPanel->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-	if (UOverlaySlot* CardSlot = Cards->AddChildToOverlay(CardPanel))
+	// The card shrinks (never grows) to fit whatever the screen leaves it, so a short landscape window still shows all of it.
+	UScaleBox* CardFit = WidgetTree->ConstructWidget<UScaleBox>();
+	CardFit->SetStretch(EStretch::ScaleToFit);
+	CardFit->SetStretchDirection(EStretchDirection::DownOnly);
+	CardFit->AddChild(CardPanel);
+	if (UOverlaySlot* CardSlot = Cards->AddChildToOverlay(CardFit))
 	{
-		CardSlot->SetHorizontalAlignment(HAlign_Center);
-		CardSlot->SetVerticalAlignment(VAlign_Center);
+		CardSlot->SetHorizontalAlignment(HAlign_Fill);
+		CardSlot->SetVerticalAlignment(VAlign_Fill);
+		CardSlot->SetPadding(FMargin(24.f, 36.f));
 	}
 
 	CardLayer = Cards;
@@ -528,6 +515,14 @@ void UPuzzleHUDWidget::ShowCard(EPuzzleCard Card)
 	CardLayer->SetVisibility(ESlateVisibility::Visible);
 }
 
+void UPuzzleHUDWidget::RefreshCard()
+{
+	if (CurrentCard != EPuzzleCard::None)
+	{
+		BuildCardContent(CurrentCard);
+	}
+}
+
 void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 {
 	using namespace UIStyle;
@@ -538,7 +533,6 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 	const APuzzleGameMode* GameMode = GetGameMode();
 	const UPuzzleManager* Rules = GameMode ? GameMode->PuzzleManager.Get() : nullptr;
 	const UPuzzleSaveGame* Save = GameMode ? GameMode->SaveGame.Get() : nullptr;
-	const FQuestLevel& Level = QuestCatalog::Get(GameMode ? GameMode->CurrentLevel : 1);
 
 	auto Add = [this](UWidget* Widget, float Top = 0.f, EHorizontalAlignment Align = HAlign_Center)
 	{
@@ -547,6 +541,10 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		ContentSlot->SetPadding(FMargin(0.f, Top, 0.f, 0.f));
 		return ContentSlot;
 	};
+	auto Btn = [this](const FString& Label, const FVector2D& Size, const FLinearColor& Fill, const FLinearColor& Fill2, int32 Action, int32 Param = 0) -> UWidget*
+	{
+		return Sized(MakeTextButton(Label, Size, Fill, Fill2, Action, Param), Size);
+	};
 	auto ButtonRow = [this](UWidget* Left, UWidget* Right)
 	{
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -554,18 +552,6 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Row->AddChildToHorizontalBox(Right)->SetPadding(FMargin(14.f, 0.f));
 		return Row;
 	};
-	auto GoalIconFor = [this](const FQuestLevel& Quest, float Size) -> UImage*
-	{
-		switch (Quest.Goal)
-		{
-		case EQuestGoal::CollectSymbol: return MakeIcon(static_cast<float>(Quest.Color), PuzzleTypes::ToLinearColor(Quest.Color), Size, 1.f, 0.3f);
-		case EQuestGoal::ClearLines:    return MakeIcon(IconLine, Cyan, Size);
-		case EQuestGoal::ClearBoxes:    return MakeIcon(IconBox, FLinearColor(0.8f, 0.4f, 1.f), Size);
-		case EQuestGoal::BreakStones:   return MakeIcon(IconGargoyle, FLinearColor(0.5f, 0.5f, 0.55f), Size);
-		default:                        return MakeIcon(IconStar, Gold, Size);
-		}
-	};
-
 	switch (Card)
 	{
 	case EPuzzleCard::Tutorial:
@@ -577,118 +563,88 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Add(MakeText(TEXT("Magic"), true, 108.f, Gold, 7.f), -30.f);
 		Add(MakeText(TEXT("a gothic block puzzle"), false, 32.f, Lavender, 3.f), -6.f);
 
-		Add(Sized(MakeTextButton(TEXT("ENDLESS"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActEndless), FVector2D(560.f, 136.f)), 44.f);
-		const int32 Best = Save ? Save->BestEndlessScore : 0;
-		Add(MakeText(Best > 0 ? FString::Printf(TEXT("best  %d"), Best) : TEXT("no best yet"), false, 30.f, PaleGold, 3.f), 8.f);
-		Add(Sized(MakeTextButton(TEXT("HOW TO PLAY"), FVector2D(460.f, 100.f), Amethyst, Amethyst2, ActHowTo), FVector2D(460.f, 100.f)), 22.f);
-
-		Add(MakeText(TEXT("Quests"), true, 50.f, PaleGold, 5.f), 40.f);
-		UUniformGridPanel* Grid = WidgetTree->ConstructWidget<UUniformGridPanel>();
-		Grid->SetSlotPadding(FMargin(7.f));
-		const int32 Unlocked = Save ? Save->HighestUnlockedLevel : 1;
-		const TArray<FQuestLevel>& Levels = QuestCatalog::Levels();
-		for (int32 Index = 0; Index < Levels.Num(); ++Index)
-		{
-			const int32 Number = Index + 1;
-			const bool bOpen = Number <= Unlocked;
-			UVerticalBox* Face = WidgetTree->ConstructWidget<UVerticalBox>();
-			Face->AddChildToVerticalBox(MakeText(FString::FromInt(Number), false, 46.f, bOpen ? FLinearColor::White : FLinearColor(0.2f, 0.2f, 0.25f), 4.f))->SetHorizontalAlignment(HAlign_Center);
-			Face->AddChildToVerticalBox(StarRow(Save ? Save->GetStars(Number) : 0, 30.f, 1.f))->SetHorizontalAlignment(HAlign_Center);
-			UButton* Button = MakeButton(Face, FVector2D(134.f, 134.f), Amethyst, Amethyst2, ActLevel, Number);
-			Button->SetIsEnabled(bOpen);
-			Grid->AddChildToUniformGrid(Sized(Button, FVector2D(134.f, 134.f)), Index / 5, Index % 5);
-		}
-		Add(Grid, 10.f);
+		Add(Btn(TEXT("PLAY"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActPlay), 36.f);
+		const AGridManager* Board = GameMode ? GameMode->GridManager.Get() : nullptr;
+		Add(MakeText(FString::Printf(TEXT("course  %dx%d"), Board ? Board->GridWidth : 8, Board ? Board->GridHeight : 8), false, 30.f, Cyan, 3.f), 6.f);
+		const int32 Best = Save ? Save->BestScore : 0;
+		Add(MakeText(Best > 0 ? FString::Printf(TEXT("best  %d"), Best) : TEXT("no best yet"), false, 30.f, PaleGold, 3.f), 2.f);
+		Add(Btn(TEXT("SELECT COURSE"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActCourses), 22.f);
+		Add(Btn(TEXT("PLAY OPTIONS"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActOptions), 14.f);
+		Add(Btn(TEXT("DEMO"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActStartDemo), 14.f);
+		Add(Btn(TEXT("HOW TO PLAY"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActHowTo), 14.f);
 		break;
 	}
-	case EPuzzleCard::LevelIntro:
+	case EPuzzleCard::Pause:
 	{
-		Add(MakeText(FString::Printf(TEXT("Level %d"), Level.Number), true, 84.f, Gold, 6.f));
-		Add(GoalIconFor(Level, 190.f), 26.f);
-		Add(MakeText(QuestCatalog::Describe(Level), false, 60.f, FLinearColor::White, 5.f), 14.f);
-		Add(MakeText(FString::Printf(TEXT("in %d moves"), Level.Moves), false, 38.f, Cyan, 3.f), 4.f);
-		if (Level.StoneInterval > 0)
+		Add(MakeText(TEXT("Menu"), true, 84.f, Gold, 6.f));
+		if (GameMode && GameMode->bAutoPlayEnabled)
 		{
-			UHorizontalBox* Warning = WidgetTree->ConstructWidget<UHorizontalBox>();
-			Warning->AddChildToHorizontalBox(MakeIcon(IconGargoyle, FLinearColor(0.5f, 0.5f, 0.55f), 64.f))->SetVerticalAlignment(VAlign_Center);
-			UHorizontalBoxSlot* WarningText = Warning->AddChildToHorizontalBox(MakeText(FString::Printf(TEXT("a gargoyle lands every %d moves"), Level.StoneInterval), false, 30.f, FLinearColor(0.75f, 0.6f, 1.f), 3.f));
-			WarningText->SetVerticalAlignment(VAlign_Center);
-			WarningText->SetPadding(FMargin(12.f, 0.f, 0.f, 0.f));
-			Add(Warning, 26.f);
-		}
-		if (Level.Number >= 5)
-		{
-			UHorizontalBox* Storm = WidgetTree->ConstructWidget<UHorizontalBox>();
-			Storm->AddChildToHorizontalBox(MakeIcon(IconMoon, LuckGreen, 64.f, 1.f, 0.4f))->SetVerticalAlignment(VAlign_Center);
-			UHorizontalBoxSlot* StormText = Storm->AddChildToHorizontalBox(MakeText(TEXT("storms and hexes roam here:\ncombos build LUCK to ward them off"), false, 30.f, FLinearColor(0.7f, 1.f, 0.75f), 3.f));
-			StormText->SetVerticalAlignment(VAlign_Center);
-			StormText->SetPadding(FMargin(12.f, 0.f, 0.f, 0.f));
-			Add(Storm, 18.f);
-		}
-		UTextBlock* Tip = MakeText(TEXT("Same-symbol lines are BLESSED: double points and +2 moves.\nThe glowing box scores x3."), false, 28.f, Lavender, 3.f);
-		Tip->SetAutoWrapText(true);
-		Add(Tip, 26.f, HAlign_Fill);
-		Add(Sized(MakeTextButton(TEXT("BEGIN"), FVector2D(520.f, 136.f), Emerald, Emerald2, ActBegin), FVector2D(520.f, 136.f)), 44.f);
-		break;
-	}
-	case EPuzzleCard::LevelComplete:
-	{
-		Add(MakeText(TEXT("Level"), true, 64.f, Gold, 5.f));
-		Add(MakeText(TEXT("Complete!"), true, 76.f, Gold, 6.f), -16.f);
-		UHorizontalBox* Stars = WidgetTree->ConstructWidget<UHorizontalBox>();
-		const int32 Earned = GameMode ? GameMode->LastStars : 0;
-		for (int32 Index = 0; Index < 3; ++Index)
-		{
-			const bool bEarned = Index < Earned;
-			UImage* Star = MakeIcon(IconStar, bEarned ? Gold : FLinearColor(0.3f, 0.22f, 0.35f), Index == 1 ? 200.f : 160.f, bEarned ? 1.f : 0.f, bEarned ? 0.8f : 0.f);
-			Star->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-			UHorizontalBoxSlot* StarSlot = Stars->AddChildToHorizontalBox(Star);
-			StarSlot->SetVerticalAlignment(Index == 1 ? VAlign_Top : VAlign_Bottom);
-			StarSlot->SetPadding(FMargin(6.f, 0.f));
-			CardStars.Add(Star);
-		}
-		Add(Stars, 24.f);
-		Add(MakeText(FString::Printf(TEXT("score  %d"), Rules ? Rules->Score : 0), false, 50.f, FLinearColor::White, 4.f), 20.f);
-		Add(MakeText(FString::Printf(TEXT("%d moves to spare"), Rules ? Rules->MovesLeft : 0), false, 32.f, Cyan, 3.f), 4.f);
-		const bool bLast = Level.Number >= QuestCatalog::Levels().Num();
-		Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(300.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(300.f, 124.f)),
-			Sized(MakeTextButton(bLast ? TEXT("RETRY") : TEXT("NEXT"), FVector2D(380.f, 124.f), Emerald, Emerald2, bLast ? ActRetry : ActNext), FVector2D(380.f, 124.f))), 44.f);
-		break;
-	}
-	case EPuzzleCard::LevelFailed:
-	case EPuzzleCard::EndlessOver:
-	{
-		const bool bOutOfMoves = Rules && Rules->IsOutOfMoves();
-		const bool bEndless = Card == EPuzzleCard::EndlessOver;
-		Add(MakeText(bEndless ? TEXT("Game Over") : (bOutOfMoves ? TEXT("Out of Moves") : TEXT("No Room Left")), true, 70.f, FLinearColor(1.f, 0.25f, 0.3f), 6.f));
-		if (bEndless)
-		{
-			Add(MakeText(FString::Printf(TEXT("%d"), Rules ? Rules->Score : 0), false, 120.f, Gold, 7.f), 20.f);
-			if (GameMode && GameMode->bLastNewBest)
-			{
-				UTextBlock* NewBest = MakeText(TEXT("NEW BEST!"), false, 54.f, Cyan, 5.f);
-				NewBest->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-				CardStars.Add(NewBest);
-				Add(NewBest, 4.f);
-			}
-			else
-			{
-				Add(MakeText(FString::Printf(TEXT("best  %d"), Save ? Save->BestEndlessScore : 0), false, 38.f, PaleGold, 3.f), 4.f);
-			}
-			Add(MakeText(bOutOfMoves ? TEXT("out of moves") : TEXT("no room left"), false, 32.f, Lavender, 3.f), 12.f);
+			Add(MakeText(TEXT("the computer is playing"), false, 32.f, Cyan, 3.f), 10.f);
+			Add(Btn(TEXT("TAKE OVER"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActTakeOver), 40.f);
 		}
 		else
 		{
-			UHorizontalBox* Progress = WidgetTree->ConstructWidget<UHorizontalBox>();
-			Progress->AddChildToHorizontalBox(GoalIconFor(Level, 110.f))->SetVerticalAlignment(VAlign_Center);
-			UHorizontalBoxSlot* ProgressText = Progress->AddChildToHorizontalBox(MakeText(FString::Printf(TEXT("%d / %d"), Rules ? FMath::Min(Rules->GetQuestProgress(), Level.Target) : 0, Level.Target), false, 70.f, FLinearColor::White, 5.f));
-			ProgressText->SetVerticalAlignment(VAlign_Center);
-			ProgressText->SetPadding(FMargin(16.f, 0.f, 0.f, 0.f));
-			Add(Progress, 30.f);
-			Add(MakeText(QuestCatalog::Describe(Level), false, 34.f, Lavender, 3.f), 8.f);
+			Add(Btn(TEXT("RESUME"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActResume), 40.f);
 		}
-		Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(300.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(300.f, 124.f)),
-			Sized(MakeTextButton(bEndless ? TEXT("PLAY AGAIN") : TEXT("RETRY"), FVector2D(420.f, 124.f), Emerald, Emerald2, ActRetry), FVector2D(420.f, 124.f))), 50.f);
+		Add(Btn(TEXT("MAIN MENU"), FVector2D(560.f, 116.f), Amethyst, Amethyst2, ActMenu), 24.f);
+		break;
+	}
+	case EPuzzleCard::Courses:
+	{
+		Add(MakeText(TEXT("Select course"), true, 52.f, Gold, 5.f));
+		Add(MakeText(TEXT("board width x height"), false, 30.f, Lavender, 3.f), 6.f);
+		const AGridManager* Board = GameMode ? GameMode->GridManager.Get() : nullptr;
+		static const int32 Courses[15][2] = {
+			{4, 4}, {4, 5}, {4, 6}, {4, 7}, {4, 8},
+			{5, 5}, {5, 6}, {5, 7}, {5, 8}, {6, 6},
+			{6, 7}, {6, 8}, {7, 7}, {7, 8}, {8, 8} };
+		for (int32 Row = 0; Row < 3; ++Row)
+		{
+			UHorizontalBox* RowBox = WidgetTree->ConstructWidget<UHorizontalBox>();
+			for (int32 Col = 0; Col < 5; ++Col)
+			{
+				const int32 W = Courses[Row * 5 + Col][0];
+				const int32 H = Courses[Row * 5 + Col][1];
+				const bool bCurrent = Board && Board->GridWidth == W && Board->GridHeight == H;
+				UWidget* Button = Btn(FString::Printf(TEXT("%dx%d"), W, H), FVector2D(128.f, 104.f), bCurrent ? Emerald : Amethyst, bCurrent ? Emerald2 : Amethyst2, ActCourse, W * 10 + H);
+				RowBox->AddChildToHorizontalBox(Button)->SetPadding(FMargin(5.f, 0.f));
+			}
+			Add(RowBox, Row == 0 ? 30.f : 14.f);
+		}
+		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 40.f);
+		break;
+	}
+	case EPuzzleCard::Options:
+	{
+		const bool bRelics = Rules && Rules->bRelicsEnabled;
+		const bool bBonus = Rules && Rules->bBonusTilesEnabled;
+		Add(MakeText(TEXT("Play options"), true, 64.f, Gold, 5.f));
+		Add(Btn(FString::Printf(TEXT("RELICS  %s"), bRelics ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bRelics ? Emerald : Ruby, bRelics ? Emerald2 : Ruby2, ActToggleRelics), 40.f);
+		Add(MakeText(TEXT("combos, relics and luck"), false, 28.f, Lavender, 3.f), 6.f);
+		Add(Btn(FString::Printf(TEXT("BONUS TILES  %s"), bBonus ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bBonus ? Emerald : Ruby, bBonus ? Emerald2 : Ruby2, ActToggleBonus), 30.f);
+		Add(MakeText(TEXT("special tiles worth extra points"), false, 28.f, Lavender, 3.f), 6.f);
+		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 44.f);
+		break;
+	}
+	case EPuzzleCard::GameOver:
+	{
+		const bool bOutOfMoves = Rules && Rules->IsOutOfMoves();
+		Add(MakeText(TEXT("Game Over"), true, 70.f, FLinearColor(1.f, 0.25f, 0.3f), 6.f));
+		Add(MakeText(FString::Printf(TEXT("%d"), Rules ? Rules->Score : 0), false, 120.f, Gold, 7.f), 20.f);
+		if (GameMode && GameMode->bLastNewBest)
+		{
+			UTextBlock* NewBest = MakeText(TEXT("NEW BEST!"), false, 54.f, Cyan, 5.f);
+			NewBest->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+			CardStars.Add(NewBest);
+			Add(NewBest, 4.f);
+		}
+		else
+		{
+			Add(MakeText(FString::Printf(TEXT("best  %d"), Save ? Save->BestScore : 0), false, 38.f, PaleGold, 3.f), 4.f);
+		}
+		Add(MakeText(bOutOfMoves ? TEXT("out of moves") : TEXT("no room left"), false, 32.f, Lavender, 3.f), 12.f);
+		Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(280.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(280.f, 124.f)),
+			Sized(MakeTextButton(TEXT("PLAY AGAIN"), FVector2D(380.f, 124.f), Emerald, Emerald2, ActRetry), FVector2D(380.f, 124.f))), 50.f);
 		break;
 	}
 	default:
@@ -705,15 +661,34 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 	}
 	switch (Action)
 	{
-	case ActEndless: GameMode->StartEndless(); break;
-	case ActLevel:   GameMode->SelectLevel(Param); break;
-	case ActBegin:   GameMode->BeginLevel(); break;
-	case ActNext:    GameMode->NextLevel(); break;
+	case ActPlay:
+		GameMode->SetAutoPlay(false);
+		GameMode->StartEndless();
+		break;
 	case ActRetry:   GameMode->Retry(); break;
 	case ActMenu:    GameMode->ShowMenu(); break;
+	case ActPause:   GameMode->OpenPauseMenu(); break;
+	case ActResume:  GameMode->ClosePauseMenu(); break;
+	case ActTakeOver: GameMode->TakeOver(); break;
+	case ActStartDemo: GameMode->StartDemo(); break;
+	case ActCourses: ShowCard(EPuzzleCard::Courses); break;
+	case ActCourse:
+		GameMode->SetCourse(Param / 10, Param % 10);
+		GameMode->ShowMenu();
+		break;
+	case ActOptions: ShowCard(EPuzzleCard::Options); break;
+	case ActToggleRelics:
+	case ActToggleBonus:
+		if (const UPuzzleManager* Rules = GameMode->PuzzleManager.Get())
+		{
+			const bool bRelics = Rules->bRelicsEnabled != (Action == ActToggleRelics);
+			const bool bBonus = Rules->bBonusTilesEnabled != (Action == ActToggleBonus);
+			GameMode->SetOptions(bRelics, bBonus);
+			RefreshCard();
+		}
+		break;
 	case ActHoly:    GameMode->RequestRelic(ERelic::HolyLight); break;
 	case ActReroll:  GameMode->RequestRelic(ERelic::Reroll); break;
-	case ActDemo:    GameMode->ToggleAutoPlay(); break;
 	case ActHowTo:   ShowTutorial(); break;
 	case ActTutorial:
 		if (Param < 0)
@@ -742,38 +717,46 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 
 	struct FSign { float Shape; FLinearColor Color; const TCHAR* Label; };
 	struct FPage { const TCHAR* Title; TArray<FSign> Signs; const TCHAR* Body; };
-	const auto Sigil = [](EPuzzleTileColor Color) { return PuzzleTypes::ToLinearColor(Color); };
-	const FLinearColor Stone(0.55f, 0.55f, 0.6f);
-	const TArray<FPage> Pages = {
-		{ TEXT("The Rite"),
-		  { { IconLine, Cyan, TEXT("ROW / COLUMN") }, { IconBox, FLinearColor(0.8f, 0.4f, 1.f), TEXT("3x3 BOX") } },
-		  TEXT("Drag a piece from the tray onto the board. Fill a whole ROW, COLUMN or 3x3 BOX and it breaks apart.\n\n")
-		  TEXT("Every piece costs a move; clears win moves back. The rite ends when the moves run out, or when no piece can fit.") },
-		{ TEXT("Combos"),
+	TArray<FPage> Pages;
+	Pages.Add({ TEXT("The Rite"),
+	  { { IconLine, Cyan, TEXT("ROUTE") } },
+	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each triangle pointing at the next, from one side of the board across to another and out.\n\n")
+	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed circuit and scores nothing.\n\n")
+	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.") });
+	if (UPuzzleManager::bMoveBudgetEnabled)
+	{
+		Pages.Last().Body = TEXT("Drag a piece from the tray onto the board. Fill a whole ROW or COLUMN and it breaks apart.\n\n")
+			TEXT("Every piece costs a move; clears win moves back. The rite ends when the moves run out, or when no piece can fit. The fourth tray slot is HOLD: park a piece there for later.");
+	}
+	const APuzzleGameMode* TutorialMode = GetGameMode();
+	const UPuzzleManager* TutorialRules = TutorialMode ? TutorialMode->PuzzleManager.Get() : nullptr;
+	if (TutorialRules && TutorialRules->bBonusTilesEnabled)
+	{
+		Pages.Add({ TEXT("Bonus Tiles"),
+		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
+		  TEXT("Glowing tiles without an arrow appear as your score grows: a plain BASIC one every 1000 points, an OUT (diamond) and an IN (eye) pair every 10000. There are never more than 2 BASIC tiles, or 1 OUT or 1 IN, on the board.\n\n")
+		  TEXT("BASIC clears when a chain of arrows joins it to a side. OUT sends a chain out through any neighbour and clears when the chain leaves the board. IN takes a chain arriving from any side, starting at a side. A chain from OUT to IN is worth 1000.") });
+	}
+	if (TutorialRules && TutorialRules->bComboEnabled)
+	{
+		Pages.Add({ TEXT("Combos"),
 		  { { IconStar, PaleGold, TEXT("COMBO") } },
 		  TEXT("Clear lines on following moves to build a COMBO. Several lines at once climb it faster.\n\n")
-		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.") },
-		{ TEXT("The Five Sigils"),
-		  { { 0.f, Sigil(EPuzzleTileColor::Red), TEXT("BLOOD") }, { 1.f, Sigil(EPuzzleTileColor::Green), TEXT("SKULL") },
-		    { 2.f, Sigil(EPuzzleTileColor::Blue), TEXT("MOON") }, { 3.f, Sigil(EPuzzleTileColor::Yellow), TEXT("CROSS") },
-		    { 4.f, Sigil(EPuzzleTileColor::Purple), TEXT("BAT") } },
-		  TEXT("Complete a line of ONE sigil and it is BLESSED: bonus points and +2 moves.\n\n")
-		  TEXT("The 3x3 box inside the golden rune circle is HOLY: clearing it scores x3.") },
-		{ TEXT("Relics"),
+		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.") });
+	}
+	if (TutorialRules && TutorialRules->bRelicsEnabled)
+	{
+		Pages.Add({ TEXT("Relics"),
 		  { { IconSun, Gold, TEXT("HOLY LIGHT") }, { IconReroll, Cyan, TEXT("REROLL") } },
-		  TEXT("HOLY LIGHT: tap the board to purge a 3x3 area. It even shatters stone.\nREROLL: summon a fresh tray of pieces.\n\n")
-		  TEXT("The fourth tray slot is HOLD: park a piece there for later. It costs no move.") },
-		{ TEXT("Curses"),
-		  { { IconGargoyle, Stone, TEXT("GARGOYLE") }, { IconStar, FLinearColor(0.55f, 0.75f, 1.f), TEXT("LIGHTNING") },
-		    { 4.f, FLinearColor(0.7f, 0.25f, 1.f), TEXT("HEX") } },
-		  TEXT("GARGOYLES fall onto the board: the first clear only cracks one, the second shatters it.\n\n")
-		  TEXT("LIGHTNING turns a tile to stone. A HEX steals 2 moves.") },
-		{ TEXT("Luck"),
+		  TEXT("HOLY LIGHT: tap the board to purge a 3x3 area.\nREROLL: summon a fresh tray of pieces.") });
+	}
+	if (TutorialRules && TutorialRules->bLuckEnabled)
+	{
+		Pages.Add({ TEXT("Luck"),
 		  { { IconMoon, LuckGreen, TEXT("LUCK") } },
 		  TEXT("Every combo step gathers +6 LUCK. Relics spend it: Holy Light -20, Reroll -12.\n\n")
-		  TEXT("When lightning or a hex comes, your luck is the chance to WARD it off (up to 90%). A ward burns 10 luck.\n\n")
-		  TEXT("The candles burn with your luck. Let it die, and the things in the dark wake.") },
-	};
+		  TEXT("The candles burn with your luck. Let it die, and the things in the dark wake.") });
+	}
 	TutorialPage = FMath::Clamp(TutorialPage, 0, Pages.Num() - 1);
 	const FPage& Page = Pages[TutorialPage];
 	const bool bLast = TutorialPage == Pages.Num() - 1;
@@ -805,7 +788,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	}
 	Add(Signs, 24.f);
 
-	UTextBlock* Body = MakeText(Page.Body, false, 34.f, FLinearColor(0.9f, 0.86f, 1.f), 3.f);
+	UTextBlock* Body = MakeText(Page.Body, false, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 3.f);
 	Body->SetAutoWrapText(true);
 	Add(Body, 30.f, HAlign_Fill);
 
@@ -818,7 +801,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	}
 	Add(Dots, 34.f);
 
-	const FVector2D ButtonSize(360.f, 120.f);
+	const FVector2D ButtonSize(330.f, 120.f);
 	UWidget* Back = Sized(MakeTextButton(TutorialPage == 0 ? TEXT("SKIP") : TEXT("BACK"), ButtonSize, Amethyst, Amethyst2, ActTutorial, TutorialPage - 1), ButtonSize);
 	UWidget* Next = Sized(MakeTextButton(bLast ? TEXT("PLAY") : TEXT("NEXT"), ButtonSize, Emerald, Emerald2, ActTutorial, bLast ? -1 : TutorialPage + 1), ButtonSize);
 	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -877,6 +860,13 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 	{
 		AddPopup(MakeText(TEXT("Holy Light!"), true, 78.f, PaleGold, 6.f), FVector2D(0.5f, 0.2f), 1.5f, 1.f);
 	}
+	else if (Result.Lines == 0)
+	{
+		if (Result.CircuitCells > 0)
+		{
+			AddPopup(MakeText(TEXT("Circuit!"), false, 96.f, FLinearColor(0.85f, 0.5f, 1.f), 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
+		}
+	}
 	else
 	{
 		static const TCHAR* Words[] = { TEXT("Nice!"), TEXT("Great!"), TEXT("Amazing!"), TEXT("Magical!!"), TEXT("LEGENDARY!!") };
@@ -885,25 +875,14 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 		AddPopup(MakeText(Words[Tier], false, 96.f + 12.f * Tier, Colors[Tier], 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
 	}
 
-	float Stagger = 0.18f;
-	if (Result.Blessings > 0)
+
+	float BonusRow = 0.f;
+	for (const FBonusEvent& Bonus : Result.Bonuses)
 	{
-		const FString Text = Result.Blessings > 1 ? FString::Printf(TEXT("BLESSED x%d!"), Result.Blessings) : TEXT("BLESSED!");
-		AddPopup(MakeText(Text, true, 60.f, PaleGold, 5.f), FVector2D(0.5f, 0.2f + 0.045f), 1.5f, 1.f, Stagger);
-		Stagger += 0.18f;
-	}
-	if (Result.bBlessedBox)
-	{
-		AddPopup(MakeText(TEXT("HOLY BOX  x3"), true, 56.f, FLinearColor(1.f, 0.85f, 0.45f), 5.f), FVector2D(0.5f, 0.2f + 0.09f), 1.5f, 1.f, Stagger);
-		Stagger += 0.18f;
-	}
-	if (Result.StonesBroken > 0)
-	{
-		AddPopup(MakeText(TEXT("Shattered!"), false, 58.f, FLinearColor(0.75f, 0.6f, 1.f), 5.f), FVector2D(0.5f, 0.2f + 0.135f), 1.3f, 1.f, Stagger);
-	}
-	else if (Result.StonesCracked > 0)
-	{
-		AddPopup(MakeText(TEXT("Cracked!"), false, 48.f, FLinearColor(0.6f, 0.55f, 0.7f), 4.f), FVector2D(0.5f, 0.2f + 0.135f), 1.2f, 1.f, Stagger);
+		const FString Label = Bonus.bLinked ? FString::Printf(TEXT("LINKED!  +%d"), Bonus.Points) : FString::Printf(TEXT("BONUS  +%d"), Bonus.Points);
+		const FLinearColor Color = Bonus.bLinked ? Gold : PuzzleTypes::BonusToColor(Bonus.Kind);
+		AddPopup(MakeText(Label, true, 56.f, Color, 5.f), FVector2D(0.5f, 0.3f + BonusRow), 1.6f, 1.f, 0.25f + BonusRow * 4.f);
+		BonusRow += 0.06f;
 	}
 
 	AddWorldPopup(MakeText(FString::Printf(TEXT("+%d"), Event.Points), false, 70.f, FLinearColor::White, 5.f), Event.Centroid, 1.2f);
@@ -921,8 +900,13 @@ void UPuzzleHUDWidget::ShowComboBroken(int32 LostCombo)
 	if (LostCombo >= 2)
 	{
 		AddPopup(MakeText(FString::Printf(TEXT("combo x%d lost"), LostCombo), false, 40.f, FLinearColor(0.55f, 0.5f, 0.65f), 3.f),
-			FVector2D(0.5f, (250.f + 62.f) / FMath::Max(CanvasSize.Y, 1.f)), 1.2f, 1.f, 0.f, -50.f);
+			ComboAnchorFraction + FVector2D(0.f, 70.f / FMath::Max(CanvasSize.Y, 1.f)), 1.2f, 1.f, 0.f, -50.f);
 	}
+}
+
+void UPuzzleHUDWidget::ShowBonusSpawned(const FVector& WorldLocation)
+{
+	AddWorldPopup(MakeText(TEXT("BONUS TILE"), true, 40.f, UIStyle::PaleGold, 4.f), WorldLocation + FVector(0.f, 0.f, 60.f), 1.4f);
 }
 
 void UPuzzleHUDWidget::ShowRelicGained(ERelic Relic)
@@ -935,39 +919,6 @@ void UPuzzleHUDWidget::ShowRelicGained(ERelic Relic)
 	TextSlot->SetPadding(FMargin(10.f, 0.f, 0.f, 0.f));
 	AddPopup(Row, FVector2D(0.5f, 0.3f), 1.8f, 1.f);
 	RelicPop[static_cast<int32>(Relic)] = 1.f;
-}
-
-void UPuzzleHUDWidget::ShowStoneLanded(const FVector& WorldLocation)
-{
-	AddWorldPopup(MakeText(TEXT("Gargoyle!"), true, 44.f, FLinearColor(0.7f, 0.45f, 1.f), 4.f), WorldLocation + FVector(0.f, 0.f, 40.f), 1.3f);
-}
-
-void UPuzzleHUDWidget::ShowOmen(EOmen Omen, bool bWarded, const FVector& WorldLocation)
-{
-	using namespace UIStyle;
-	const bool bLightning = Omen == EOmen::Lightning;
-	if (bWarded)
-	{
-		// The hex's ward lands a beat later (see AGridManager::PlayHex).
-		const float WardDelay = bLightning ? 0.f : 0.55f;
-		AddPopup(MakeText(TEXT("WARDED!"), true, 76.f, PaleGold, 6.f), FVector2D(0.5f, 0.24f), 1.6f, 1.f, WardDelay);
-		AddPopup(MakeText(bLightning ? TEXT("luck turned the lightning aside") : TEXT("luck broke the hex"), false, 36.f, FLinearColor(0.95f, 0.88f, 0.6f), 3.f),
-			FVector2D(0.5f, 0.28f), 1.8f, 1.f, WardDelay + 0.2f, 30.f);
-		LuckPop = 1.f;
-		return;
-	}
-	if (bLightning)
-	{
-		AddPopup(MakeText(TEXT("LIGHTNING!"), true, 72.f, FLinearColor(0.6f, 0.8f, 1.f), 6.f), FVector2D(0.5f, 0.24f), 1.4f);
-		AddWorldPopup(MakeText(TEXT("Petrified!"), false, 44.f, FLinearColor(0.75f, 0.8f, 0.9f), 4.f), WorldLocation + FVector(0.f, 0.f, 40.f), 1.3f, 1.f, 0.15f);
-	}
-	else
-	{
-		AddPopup(MakeText(TEXT("HEXED!"), true, 76.f, FLinearColor(0.75f, 0.3f, 1.f), 6.f), FVector2D(0.5f, 0.24f), 1.6f);
-		const float BarBottom = 246.f / FMath::Max(CanvasSize.Y, 1.f);
-		AddPopup(MakeText(FString::Printf(TEXT("-%d MOVES"), UPuzzleManager::HexMoveCost), false, 40.f, Danger, 4.f), FVector2D(0.19f, BarBottom), 1.6f, 1.f, 0.2f, -40.f);
-		MovesPop = 1.f;
-	}
 }
 
 // --- Per-frame -------------------------------------------------------------------
@@ -1046,6 +997,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	SyncAspect(TopBarBg);
 	SyncAspect(CardBg);
 
+
 	// Score counts up toward the real value.
 	const float TargetScore = static_cast<float>(Rules->Score);
 	DisplayedScore = FMath::FInterpTo(DisplayedScore, TargetScore, InDeltaTime, 6.f);
@@ -1053,47 +1005,39 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	{
 		DisplayedScore = TargetScore;
 	}
-	ScoreText->SetText(FText::AsNumber(FMath::RoundToInt(DisplayedScore)));
+	const FText ScoreNumber = FText::AsNumber(FMath::RoundToInt(DisplayedScore));
+	ScoreText->SetText(ScoreNumber);
+	const int32 ScoreChars = ScoreNumber.ToString().Len();
+	const float ScoreSize = ScoreChars <= 6 ? 74.f : (ScoreChars == 7 ? 58.f : 46.f);
+	if (!FMath::IsNearlyEqual(ScoreSize, ScoreFontSize))
+	{
+		ScoreFontSize = ScoreSize;
+		ScoreText->SetFont(Font(false, ScoreSize, 5.f));
+	}
 
 	// Moves: red and throbbing when low, a bounce when moves are refunded.
-	const int32 Moves = Rules->MovesLeft;
-	const bool bLow = Moves <= 5;
-	MovesText->SetText(FText::AsNumber(Moves));
-	MovesText->SetColorAndOpacity(FSlateColor(bLow ? Danger : Cyan));
-	MovesPop = FMath::Max(MovesPop - InDeltaTime * 2.5f, 0.f);
-	const float MovesScale = (bLow ? 1.f + 0.08f * FMath::Sin(Time * 10.f) : 1.f) + 0.35f * MovesPop * MovesPop;
-	MovesText->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-	MovesText->SetRenderScale(FVector2D(MovesScale));
-
-	// Goal (quests) or best score (endless).
-	if (Rules->Mode == EPlayMode::Quest)
+	if (UPuzzleManager::bMoveBudgetEnabled)
 	{
-		const FQuestLevel& Quest = Rules->Quest;
-		GoalLabel->SetText(FText::FromString(FString::Printf(TEXT("LEVEL %d"), Quest.Number)));
-		GoalText->SetText(FText::FromString(FString::Printf(TEXT("%d/%d"), FMath::Min(Rules->GetQuestProgress(), Quest.Target), Quest.Target)));
-		float Shape = IconStar;
-		FLinearColor Color = Gold;
-		switch (Quest.Goal)
-		{
-		case EQuestGoal::CollectSymbol: Shape = static_cast<float>(Quest.Color); Color = PuzzleTypes::ToLinearColor(Quest.Color); break;
-		case EQuestGoal::ClearLines:    Shape = IconLine; Color = Cyan; break;
-		case EQuestGoal::ClearBoxes:    Shape = IconBox; Color = FLinearColor(0.8f, 0.4f, 1.f); break;
-		case EQuestGoal::BreakStones:   Shape = IconGargoyle; Color = FLinearColor(0.5f, 0.5f, 0.55f); break;
-		default: break;
-		}
-		if (UMaterialInstanceDynamic* MID = GoalIcon->GetDynamicMaterial())
-		{
-			MID->SetScalarParameterValue(TEXT("Shape"), Shape);
-			MID->SetVectorParameterValue(TEXT("Color"), Color);
-		}
-		GoalIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
+		const int32 Moves = Rules->MovesLeft;
+		const bool bLow = Moves <= 5;
+		MovesText->SetText(FText::AsNumber(Moves));
+		MovesText->SetColorAndOpacity(FSlateColor(bLow ? Danger : Cyan));
+		MovesPop = FMath::Max(MovesPop - InDeltaTime * 2.5f, 0.f);
+		const float MovesScale = (bLow ? 1.f + 0.08f * FMath::Sin(Time * 10.f) : 1.f) + 0.35f * MovesPop * MovesPop;
+		MovesText->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+		MovesText->SetRenderScale(FVector2D(MovesScale));
 	}
-	else
+
+	// Best score, live once this round passes it.
+	const int32 Best = GameMode->SaveGame ? FMath::Max(GameMode->SaveGame->BestScore, Rules->Score) : Rules->Score;
+	const FText BestNumber = FText::AsNumber(Best);
+	BestText->SetText(BestNumber);
+	const int32 BestChars = BestNumber.ToString().Len();
+	const float BestSize = BestChars <= 6 ? 52.f : (BestChars == 7 ? 42.f : 34.f);
+	if (!FMath::IsNearlyEqual(BestSize, BestFontSize))
 	{
-		const int32 Best = GameMode->SaveGame ? FMath::Max(GameMode->SaveGame->BestEndlessScore, Rules->Score) : Rules->Score;
-		GoalLabel->SetText(FText::FromString(TEXT("BEST")));
-		GoalText->SetText(FText::AsNumber(Best));
-		GoalIcon->SetVisibility(ESlateVisibility::Collapsed);
+		BestFontSize = BestSize;
+		BestText->SetFont(Font(false, BestSize, 5.f));
 	}
 
 	// Combo meter: pops when it grows, trembles on its last pip, hidden at zero.
@@ -1104,7 +1048,20 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	}
 	LastCombo = Combo;
 	ComboPop = FMath::Max(ComboPop - InDeltaTime * 2.2f, 0.f);
-	const bool bShowCombo = Combo > 0 && bPlayingView;
+	// The combo badge hangs in the gap between the two candle clusters: project that spot into the view each frame.
+	{
+		APlayerController* ComboPC = GetOwningPlayer();
+		FVector2D ComboSpot;
+		if (ComboPC && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(ComboPC, FVector(10.f, -620.f, 10.f), ComboSpot, true))
+		{
+			ComboAnchorFraction = ComboSpot / FVector2D(FMath::Max(CanvasSize.X, 1.f), FMath::Max(CanvasSize.Y, 1.f));
+			if (UCanvasPanelSlot* ComboSlotNow = Cast<UCanvasPanelSlot>(ComboBadge->Slot))
+			{
+				ComboSlotNow->SetPosition(ComboSpot);
+			}
+		}
+	}
+	const bool bShowCombo = Rules->bComboEnabled && Combo > 0 && bPlayingView;
 	ComboBadge->SetVisibility(bShowCombo ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (bShowCombo)
 	{
@@ -1139,7 +1096,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		const int32 Charges = Rules->GetRelicCharges(static_cast<ERelic>(RelicIndex));
 		RelicCounts[RelicIndex]->SetText(FText::AsNumber(Charges));
 		// Never disabled (Slate's disabled look greys the icon out); clicks are ignored by the game mode instead.
-		RelicBadges[RelicIndex]->SetVisibility(bPlayingView ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		RelicBadges[RelicIndex]->SetVisibility(bPlayingView && Rules->bRelicsEnabled ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 		RelicBadges[RelicIndex]->SetRenderOpacity(Charges > 0 && (bInput || GameMode->bAutoPlayEnabled) ? 1.f : 0.5f);
 
 		RelicPop[RelicIndex] = FMath::Max(RelicPop[RelicIndex] - InDeltaTime * 2.f, 0.f);
@@ -1154,7 +1111,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 
 	// Luck: eased number and bar, pops with a floating +/- whenever it changes.
 	const int32 LuckNow = Rules->GetLuck();
-	LuckBadge->SetVisibility(bPlayingView ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	LuckBadge->SetVisibility(bPlayingView && Rules->bLuckEnabled ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (LastLuck < 0)
 	{
 		DisplayedLuck = static_cast<float>(LuckNow);
@@ -1202,7 +1159,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 #if PLATFORM_IOS || PLATFORM_ANDROID
 		Hint = TEXT("DEMO - the computer is playing");
 #else
-		Hint = TEXT("DEMO - the computer is playing\n[P] take over");
+		Hint = TEXT("DEMO - the computer is playing\n[P] menu");
 #endif
 		HintColor = Cyan;
 	}
@@ -1213,7 +1170,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	}
 	else if (GameMode->Flow == EPuzzleFlow::Playing && Rules->IsStuck())
 	{
-		Hint = TEXT("No room! Use a relic");
+		Hint = Rules->bRelicsEnabled ? TEXT("No room! Use a relic") : TEXT("No room left");
 		HintColor = FLinearColor(1.f, 0.3f, 0.25f, 0.75f + 0.25f * FMath::Sin(Time * 8.f));
 	}
 	else if (GameMode->Flow == EPuzzleFlow::Playing)

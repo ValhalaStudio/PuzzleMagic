@@ -13,29 +13,24 @@ public:
 	static constexpr const TCHAR* SlotName = TEXT("PuzzleProgress");
 
 	UPROPERTY()
-	int32 HighestUnlockedLevel = 1;
+	int32 BestScore = 0;
 
-	// Best star rating per quest level (index = level - 1).
+	// The course (board size) and the play options picked in the menus.
 	UPROPERTY()
-	TArray<int32> LevelStars;
+	int32 CourseWidth = 8;
 
 	UPROPERTY()
-	int32 BestEndlessScore = 0;
+	int32 CourseHeight = 8;
+
+	UPROPERTY()
+	bool bOptionRelics = false;
+
+	UPROPERTY()
+	bool bOptionBonusTiles = false;
 
 	// The "How to play" pages open by themselves on the very first launch only.
 	UPROPERTY()
 	bool bSeenTutorial = false;
-
-	int32 GetStars(int32 Level) const { return LevelStars.IsValidIndex(Level - 1) ? LevelStars[Level - 1] : 0; }
-
-	void RecordStars(int32 Level, int32 Stars)
-	{
-		if (LevelStars.Num() < Level)
-		{
-			LevelStars.SetNumZeroed(Level);
-		}
-		LevelStars[Level - 1] = FMath::Max(LevelStars[Level - 1], Stars);
-	}
 
 	static UPuzzleSaveGame* LoadOrCreate();
 	void Save();

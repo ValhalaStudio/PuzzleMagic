@@ -107,7 +107,7 @@ void APuzzleCameraPawn::UpdateFraming()
 	LastViewportSize = ViewportSize;
 
 	const float Aspect = ViewportSize.X / ViewportSize.Y;
-	const float HorizontalFOV = Aspect < 1.f ? PortraitFOV : LandscapeFOV;
+	const float HorizontalFOV = LandscapeFOV;
 	Camera->SetFieldOfView(HorizontalFOV);
 
 	// UE keeps the horizontal FOV fixed, so the vertical one follows the aspect ratio.
@@ -117,10 +117,13 @@ void APuzzleCameraPawn::UpdateFraming()
 	const FVector2D Center = FramingBounds.GetCenter();
 	const FVector2D HalfSize = FramingBounds.GetExtent();
 	const float Tilt = FMath::Sin(FMath::DegreesToRadians(-ViewPitch));
-	const float Distance = FMath::Max(HalfSize.X / TanHalfH, HalfSize.Y * Tilt / TanHalfV) * FramingMargin;
+	// The vertical fit gets extra room: the tray at the near edge looms larger than the tilt alone predicts,
+	// which cut it off at the bottom in short landscape windows.
+	constexpr float PerspectiveAllowance = 1.16f;
+	const float Distance = FMath::Max(HalfSize.X / TanHalfH, HalfSize.Y * Tilt * PerspectiveAllowance / TanHalfV) * FramingMargin;
 
 	const FRotator ViewRotation(ViewPitch, ViewYaw, 0.f);
-	const FVector Focus(Center.X, Center.Y + FocusShiftY, FramingGroundZ);
+	const FVector Focus(Center.X, Center.Y, FramingGroundZ);
 	RestLocation = Focus - ViewRotation.Vector() * Distance;
 	SetActorLocationAndRotation(RestLocation, ViewRotation);
 }

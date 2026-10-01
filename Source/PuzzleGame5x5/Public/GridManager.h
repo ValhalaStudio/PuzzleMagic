@@ -9,26 +9,40 @@ class APuzzleTile;
 class UBoxComponent;
 class URealtimeMeshComponent;
 class UStaticMeshComponent;
-class UPointLightComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 
-// Outcome of one clear (a placement's line clears, or a Holy Light blast).
-struct FClearResult
+// One completed route, in flow order.
+struct FRouteInfo
 {
-	int32 Lines = 0;          // rows + columns + boxes completed
-	int32 Cells = 0;          // cells actually emptied
-	int32 Boxes = 0;
-	int32 Blessings = 0;      // completed lines whose tiles all share one symbol
-	bool bBlessedBox = false; // the glowing blessed box was among the clears
-	int32 StonesCracked = 0;
-	int32 StonesBroken = 0;
-	int32 ColorCounts[PuzzleColorCount] = {};
+	TArray<int32> Cells;
+	bool bNeighbouring = false; // joins two neighbouring sides rather than opposite ones
+	int32 ExtraTiles = 0;       // tiles beyond the route's basic length (the n in the route bonus)
 };
 
-// Owns the 9x9 board state, the tray (three pieces + one reserve "hold" slot),
-// gargoyle stones, the blessed box, and all board/tray visuals.
-// Portrait layout (iOS): board on top, tray row underneath.
+// One bonus tile that was cleared, with the chain of tiles that cleared it.
+struct FBonusEvent
+{
+	EPuzzleBonus Kind = EPuzzleBonus::Basic;
+	bool bLinked = false;     // an outgoing tile joined to an incoming one
+	int32 ExtraTiles = 0;     // chain tiles beyond the straight line from the bonus tile to its nearest side
+	TArray<int32> Cells;      // the chain, in flow order, including the bonus tile(s)
+	int32 Points = 0;         // filled in by the rules
+};
+
+// Outcome of one clear (a placement's route clears, or a Holy Light blast).
+struct FClearResult
+{
+	int32 Lines = 0;          // routes completed
+	TArray<FRouteInfo> Routes; // the completed routes, for scoring
+	TArray<FBonusEvent> Bonuses; // the bonus tiles cleared by chains
+	int32 Cells = 0;          // cells emptied by routes (these score)
+	int32 CircuitCells = 0;   // cells emptied by closed circuits (these do not score)
+};
+
+// Owns the board state (4x4 up to 8x8), the tray (three pieces + one reserve "hold" slot)
+// and all board/tray visuals.
+// Landscape layout: board on top, tray row underneath.
 UCLASS()
 class PUZZLEGAME5X5_API AGridManager : public AActor
 {
@@ -40,8 +54,14 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-	static constexpr int32 GridSize = 9;
-	static constexpr int32 BoxSize = 3;
+	// The board is GridWidth by GridHeight cells, each 4 to 8. Change it with SetGridSize (then InitBoard).
+	static constexpr int32 MinGridSide = 4;
+	static constexpr int32 MaxGridSide = 8;
+	int32 GridWidth = MaxGridSide;
+	int32 GridHeight = MaxGridSide;
+
+	// Resizes the board: rebuilds the frame, slots, tray and collision. Call InitBoard afterwards for a fresh round.
+	void SetGridSize(int32 Width, int32 Height);
 	static constexpr int32 TraySize = 3;      // regular slots 0..2
 	static constexpr int32 ReserveSlot = 3;   // the hold slot
 	static constexpr int32 SlotCount = 4;
@@ -69,31 +89,28 @@ public:
 	void ShowAreaTarget(int32 CenterX, int32 CenterY);
 	void HideAreaTarget();
 
-	// Clears full rows/columns/boxes from the board state immediately; the visual
+	// Clears every completed route and closed circuit from the board state immediately; the visual
 	// pop starts after ClearDelay (so it can wait for a piece still flying in).
+	// A route is a chain of tiles, each pointing at the next, that starts on one side of the board
+	// and ends with its last tile pointing off the opposite (or a neighbouring) side. A closed circuit is
+	// a loop of tiles that point round in a circle, or a chain that leaves through the side it started on.
 	FClearResult CheckAndClearLines(float ClearDelay = 0.f);
 
-	// Holy Light: clears the 3x3 area around a cell, shattering stones outright.
+	// Holy Light: clears the 3x3 area around a cell.
 	FClearResult ClearArea(int32 CenterX, int32 CenterY, float Delay = 0.f);
 
-	// Drops a gargoyle stone on a random empty cell (the fall starts after Delay). False if the board is full.
-	bool SpawnCurseStone(FIntPoint& OutCell, float Delay = 0.f);
-
-	// Omens. Lightning prefers a normal tile (it petrifies it); an empty cell gets a stone. (-1,-1) if nothing can be struck.
-	FIntPoint PickLightningTarget() const;
-	// The bolt lands after Delay. Warded: it breaks on a golden shield above the board and the cell is spared.
-	void StrikeLightning(const FIntPoint& Cell, float Delay, bool bWarded);
-	// A hex's rune circle over the board (the rules take the moves); warded, gold light burns it away.
-	void PlayHex(float Delay, bool bWarded);
+	// Drops a bonus tile of the given kind on a random empty cell (it lands after the clears have popped).
+	// False if the board is full.
+	bool SpawnBonusTile(EPuzzleBonus Kind, FIntPoint& OutCell);
+	int32 CountBonusTiles(EPuzzleBonus Kind) const;
 
 	// Game over: every tile on the board bursts off with physics.
 	void CollapseBoard();
 
-	// Centre cell of the 3x3 area holding the most tiles (stones count double).
+	// Centre cell of the 3x3 area holding the most tiles.
 	FIntPoint FindDensestArea() const;
 
 	int32 CountFilled() const;
-	int32 GetBlessedBox() const { return BlessedBox; }
 	FVector GetLastClearCentroid() const { return LastClearCentroid; }
 
 	// Location of a tile's base (the board surface) at a cell.
@@ -132,6 +149,7 @@ public:
 	void RefreshTrayVisuals();
 
 	// --- AI/bot support: evaluate a hypothetical placement without mutating the board ---
+	// Number of routes the placement would complete, or -1 if it is illegal.
 	int32 SimulateLinesCleared(const FPuzzlePieceShape& Shape, int32 OriginX, int32 OriginY) const;
 	int32 CountFilledNeighbors(int32 X, int32 Y) const;
 
@@ -142,13 +160,6 @@ private:
 	// Physics floor for tiles bursting off the board.
 	UPROPERTY(VisibleAnywhere, Category = "Puzzle")
 	TObjectPtr<UBoxComponent> BoardCollision;
-
-	// Rune circle + light marking the blessed box.
-	UPROPERTY(VisibleAnywhere, Category = "Puzzle")
-	TObjectPtr<UStaticMeshComponent> BlessedAura;
-
-	UPROPERTY(VisibleAnywhere, Category = "Puzzle")
-	TObjectPtr<UPointLightComponent> BlessedLight;
 
 	UPROPERTY(VisibleAnywhere, Category = "Puzzle")
 	TObjectPtr<UStaticMeshComponent> TargetAura;
@@ -166,12 +177,7 @@ private:
 	TObjectPtr<UMaterialInterface> AuraMaterial;
 
 	void BuildBoardVisuals();
-	void SpawnStoneAt(int32 Index, float Delay, float FallTime, float FallHeight);
-	APuzzleTile* SpawnTile(const FVector& BaseLocation, EPuzzleTileColor Color, float Scale);
-	void ChooseBlessedBox();
-	void UpdateBlessedVisuals();
-	bool IsInBlessedBox(int32 X, int32 Y) const;
-	bool IsLineBlessed(const TArray<int32>& Cells) const;
+	APuzzleTile* SpawnTile(const FVector& BaseLocation, EPuzzleTileColor Color, EPuzzleDir Dir, float Scale);
 	void PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, class APuzzleFX* FX);
 
 	UPROPERTY()
@@ -179,14 +185,18 @@ private:
 	TArray<int32> TrayVisualSlots;
 
 	UPROPERTY()
-	TArray<bool> Filled; // row-major, Y * GridSize + X
+	TArray<bool> Filled; // row-major, Y * GridWidth + X
 
 	UPROPERTY()
 	TArray<EPuzzleTileColor> CellColors;
 
-	// 0 = normal tile/empty, 2 = intact gargoyle stone, 1 = cracked stone.
+	// The triangle direction of the tile on each cell (only meaningful where Filled is true).
 	UPROPERTY()
-	TArray<uint8> CellStone;
+	TArray<EPuzzleDir> CellDirs;
+
+	// The bonus kind of the tile on each cell (an EPuzzleBonus value; 0 = an ordinary tile).
+	UPROPERTY()
+	TArray<uint8> CellBonus;
 
 	UPROPERTY()
 	TArray<TObjectPtr<APuzzleTile>> CellVisuals;
@@ -194,15 +204,15 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<APuzzleTile>> GhostTiles;
 
-	int32 BlessedBox = -1;
 	FVector LastClearCentroid = FVector::ZeroVector;
 
 	bool IsValidCoord(int32 X, int32 Y) const;
-	TArray<int32> GetFullRows() const;
-	TArray<int32> GetFullColumns() const;
-	TArray<int32> GetFullBoxes() const;
 
-	static TArray<int32> ComputeFullRows(const TArray<bool>& FilledState);
-	static TArray<int32> ComputeFullColumns(const TArray<bool>& FilledState);
-	static TArray<int32> ComputeFullBoxes(const TArray<bool>& FilledState);
+	// Finds the routes and the cells of closed circuits. A route leaves the board through the side opposite
+	// its first tile's side, or through a neighbouring side. A chain of two or more tiles that leaves through
+	// the side it started on counts as a closed circuit.
+	// Finds the bonus tiles that a chain clears right now: basic, outgoing, incoming and linked pairs.
+	// A bonus tile points nowhere: chains end on it, and a chain can leave it through any neighbour.
+	void FindBonusEvents(TArray<FBonusEvent>& OutEvents) const;
+	void FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells) const;
 };

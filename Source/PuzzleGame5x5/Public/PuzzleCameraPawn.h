@@ -7,7 +7,7 @@
 class UCameraComponent;
 
 // Fixed camera that frames the board + tray for whatever screen shape it runs on
-// (portrait phones included), with an optional screen shake. It positions itself
+// (the game is landscape only), with an optional screen shake. It positions itself
 // because the GameMode only copies a PlayerStart's yaw, never its pitch.
 UCLASS()
 class PUZZLEGAME5X5_API APuzzleCameraPawn : public APawn
@@ -30,19 +30,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")
 	float ViewYaw = -90.f;
 
-	// Horizontal FOV per orientation; portrait uses a narrower one to limit stretching at the top and bottom.
 	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")
 	float LandscapeFOV = 50.f;
 
 	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")
-	float PortraitFOV = 32.f;
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")
 	float FramingMargin = 1.08f;
-
-	// Shifts the framed content down the screen (world -Y is screen-up) to leave room for the score.
-	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")
-	float FocusShiftY = -70.f;
 
 	// Fixed (manual) exposure, so the look doesn't pump as the board fills.
 	UPROPERTY(EditAnywhere, Category = "Puzzle|Camera")

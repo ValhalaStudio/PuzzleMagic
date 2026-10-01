@@ -27,7 +27,7 @@ bool UPuzzleBotPlayer::TakeBestAction()
 	}
 
 	// A crowded board is worth a Holy Light before it gets desperate.
-	const int32 CellCount = AGridManager::GridSize * AGridManager::GridSize;
+	const int32 CellCount = GridManager->GridWidth * GridManager->GridHeight;
 	if (PuzzleManager->GetRelicCharges(ERelic::HolyLight) > 0 && GridManager->CountFilled() > CellCount * 0.6f)
 	{
 		const FIntPoint Area = GridManager->FindDensestArea();
@@ -49,9 +49,9 @@ bool UPuzzleBotPlayer::TakeBestAction()
 
 		const FPuzzlePieceShape& Shape = GridManager->Tray[Slot];
 
-		for (int32 OriginY = 0; OriginY < AGridManager::GridSize; ++OriginY)
+		for (int32 OriginY = 0; OriginY < GridManager->GridHeight; ++OriginY)
 		{
-			for (int32 OriginX = 0; OriginX < AGridManager::GridSize; ++OriginX)
+			for (int32 OriginX = 0; OriginX < GridManager->GridWidth; ++OriginX)
 			{
 				const int32 LinesCleared = GridManager->SimulateLinesCleared(Shape, OriginX, OriginY);
 				if (LinesCleared < 0)

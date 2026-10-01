@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puzzle Magic Architecture</title>
-<meta name="description" content="How the Puzzle Magic Unreal Engine 5.8 project is built: layers, classes, a move end to end, tools, content pipeline and the 9x9 board.">
+<meta name="description" content="How the Puzzle Magic Unreal Engine 5.8 project is built: layers, classes, a move end to end, tools, content pipeline and the 8x8 board.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Cinzel:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -332,7 +332,7 @@ footer { padding-block: 30px 44px; color: var(--muted); font-size: 14px; }
     <div>
       <p class="eyebrow">Unreal Engine 5.8 · C++20 · iPhone and Windows</p>
       <h1>Puzzle Magic</h1>
-      <p class="lede">How the 9×9 gothic block puzzle is put together: its layers, every class and member, one move traced end to end, the tools behind the content, and why the board is 9×9.</p>
+      <p class="lede">How the 8×8 gothic block puzzle is put together: its layers, every class and member, one move traced end to end, the tools behind the content, and why the board is 8×8 with rows and columns only.</p>
       <dl class="facts">__FACTS__</dl>
     </div>
     __BOARD_MARK__
@@ -347,7 +347,7 @@ footer { padding-block: 30px 44px; color: var(--muted); font-size: 14px; }
     <li><a href="#move">A move</a></li>
     <li><a href="#tools">Tools &amp; libraries</a></li>
     <li><a href="#pipeline">Content pipeline</a></li>
-    <li><a href="#grid">Why 9×9</a></li>
+    <li><a href="#grid">Why 8×8</a></li>
     <li><a href="#run">Run &amp; tune</a></li>
   </ul>
 </nav>
@@ -374,7 +374,7 @@ footer { padding-block: 30px 44px; color: var(--muted); font-size: 14px; }
     <div class="cd-tools" role="group" aria-label="Diagram controls">
       <div class="search">
         <label for="cd-search" class="eyebrow" style="margin:0">Find</label>
-        <input type="search" id="cd-search" placeholder="Class or member, e.g. RollOmen" autocomplete="off">
+        <input type="search" id="cd-search" placeholder="Class or member, e.g. TryPlacePiece" autocomplete="off">
       </div>
       <fieldset>
         <legend>Arrows</legend>

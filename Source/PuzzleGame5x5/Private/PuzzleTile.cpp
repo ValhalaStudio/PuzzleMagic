@@ -50,9 +50,7 @@ APuzzleTile::APuzzleTile()
 	TileMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	TileMesh->SetCastShadow(true);
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TileMaterialFinder(TEXT("/Game/Materials/M_TileGothic.M_TileGothic"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BezelMaterialFinder(TEXT("/Game/Materials/M_Bezel.M_Bezel"));
-	TileMaterial = TileMaterialFinder.Object;
 	BezelMaterial = BezelMaterialFinder.Object;
 }
 
@@ -62,6 +60,10 @@ void APuzzleTile::PostInitializeComponents()
 
 	TileMesh->SetRealtimeMesh(SharedTileMesh());
 
+	if (!TileMaterial)
+	{
+		TileMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_TileRoute.M_TileRoute"));
+	}
 	if (TileMaterial)
 	{
 		DynamicMaterial = UMaterialInstanceDynamic::Create(TileMaterial, this);
@@ -78,6 +80,32 @@ void APuzzleTile::PostInitializeComponents()
 void APuzzleTile::SetTileColor(EPuzzleTileColor NewColor)
 {
 	TileColor = NewColor;
+	ApplyVisualState();
+}
+
+void APuzzleTile::SetDirection(EPuzzleDir NewDir)
+{
+	TileDirection = NewDir;
+	bHasDirection = true;
+	ApplyVisualState();
+}
+
+void APuzzleTile::SetBonus(EPuzzleBonus NewBonus)
+{
+	Bonus = NewBonus;
+	if (Bonus != EPuzzleBonus::None)
+	{
+		// Loaded when needed, not from the constructor, so the asset can be rebuilt by the editor script.
+		if (!BonusMaterial)
+		{
+			BonusMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_TileBonus.M_TileBonus"));
+		}
+		if (BonusMaterial)
+		{
+			DynamicMaterial = UMaterialInstanceDynamic::Create(BonusMaterial, this);
+			TileMesh->SetMaterial(0, DynamicMaterial);
+		}
+	}
 	ApplyVisualState();
 }
 
@@ -98,51 +126,14 @@ void APuzzleTile::ApplyVisualState()
 	{
 		return;
 	}
-	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), PuzzleTypes::ToLinearColor(TileColor));
-	DynamicMaterial->SetScalarParameterValue(TEXT("Symbol"), static_cast<float>(TileColor));
+	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Bonus != EPuzzleBonus::None ? PuzzleTypes::BonusToColor(Bonus) : PuzzleTypes::ToLinearColor(TileColor));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), Bonus != EPuzzleBonus::None ? 1.f : 0.f);
+	const bool bIsBonus = Bonus != EPuzzleBonus::None;
+	// Bonus tiles point nowhere and carry no sigil; their emblem (if any) tells the kind.
+	DynamicMaterial->SetScalarParameterValue(TEXT("Symbol"), bIsBonus ? -1.f : static_cast<float>(TileColor));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Emblem"), Bonus == EPuzzleBonus::Outgoing ? 1.f : (Bonus == EPuzzleBonus::Incoming ? 2.f : 0.f));
+	DynamicMaterial->SetScalarParameterValue(TEXT("Direction"), (bHasDirection && !bIsBonus) ? static_cast<float>(TileDirection) : -1.f);
 	DynamicMaterial->SetScalarParameterValue(TEXT("Glow"), CurrentGlow);
-	DynamicMaterial->SetScalarParameterValue(TEXT("Stone"), CurrentStone);
-	DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), CurrentShimmer);
-}
-
-void APuzzleTile::SetStone(int32 Level)
-{
-	CurrentStone = static_cast<float>(Level);
-	if (DynamicMaterial)
-	{
-		DynamicMaterial->SetScalarParameterValue(TEXT("Stone"), CurrentStone);
-	}
-}
-
-void APuzzleTile::SetShimmer(float Amount)
-{
-	CurrentShimmer = Amount;
-	if (DynamicMaterial)
-	{
-		DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), Amount);
-	}
-}
-
-void APuzzleTile::PlayStoneHit(float Delay)
-{
-	if (Anim == EAnim::Arriving || Anim == EAnim::Squash)
-	{
-		SetActorLocation(ArriveTo);
-		SetActorScale3D(FVector(RestScale));
-	}
-	ArriveTo = GetActorLocation();
-	RestScale = GetActorScale3D().X;
-	AnimDelay = Delay;
-	AnimTime = 0.f;
-	Anim = EAnim::StoneHit;
-	bPetrifying = false;
-	SetActorTickEnabled(true);
-}
-
-void APuzzleTile::PlayPetrify(float Delay)
-{
-	PlayStoneHit(Delay);
-	bPetrifying = true;
 }
 
 void APuzzleTile::SetGlow(float Glow)
@@ -307,36 +298,6 @@ void APuzzleTile::Tick(float DeltaTime)
 		if (AnimTime >= Lifetime)
 		{
 			Destroy();
-		}
-		break;
-	}
-	case EAnim::StoneHit:
-	{
-		// Flash, crack, and a short heavy shudder with a hop.
-		constexpr float HitDuration = 0.4f;
-		const float U = FMath::Min(AnimTime / HitDuration, 1.f);
-		if (bPetrifying)
-		{
-			if (CurrentStone < 1.5f)
-			{
-				SetStone(2);
-				SetShimmer(0.f);
-			}
-		}
-		else if (CurrentStone > 1.5f)
-		{
-			SetStone(1);
-		}
-		SetGlow((bPetrifying ? 2.5f : 1.2f) * (1.f - U));
-		const float Shake = FMath::Sin(U * 50.f) * (1.f - U) * 5.f;
-		SetActorLocation(ArriveTo + FVector(Shake, 0.f, 18.f * FMath::Sin(U * PI)));
-		if (U >= 1.f)
-		{
-			SetActorLocation(ArriveTo);
-			SetGlow(0.f);
-			bPetrifying = false;
-			Anim = EAnim::None;
-			SetActorTickEnabled(false);
 		}
 		break;
 	}
