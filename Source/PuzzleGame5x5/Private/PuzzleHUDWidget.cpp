@@ -4,6 +4,7 @@
 #include "PuzzleInputHandler.h"
 #include "PuzzleSaveGame.h"
 #include "GridManager.h"
+#include "TrickOrTreat.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/Button.h"
@@ -49,6 +50,8 @@ namespace UIStyle
 	const FLinearColor Locked2(0.01f, 0.01f, 0.012f);
 
 	const FLinearColor LuckGreen(0.45f, 1.f, 0.55f);
+	const FLinearColor Pumpkin(1.f, 0.38f, 0.04f);
+	const FLinearColor Pumpkin2(0.3f, 0.08f, 0.005f);
 
 	// Icon shapes in M_UIIcon.
 	constexpr float IconMoon = 2.f;
@@ -273,7 +276,7 @@ void UPuzzleHUDWidget::BuildHUD()
 	TopBarSlot->SetPosition(FVector2D(-22.f, 36.f));
 	TopBarSlot->SetSize(FVector2D(560.f, 174.f));
 
-	// ---- Combo meter: "TREAT! x5!" and three pips = placements left to keep it alive ----
+	// ---- Combo meter: "COMBO x5!" and three pips = placements left to keep it alive ----
 	UOverlay* Combo = WidgetTree->ConstructWidget<UOverlay>();
 	Combo->SetVisibility(ESlateVisibility::HitTestInvisible);
 	ComboBg = MakePanel(FLinearColor(0.4f, 0.03f, 0.3f), FLinearColor(0.1f, 0.005f, 0.09f), Rim, 330.f / 92.f, 0.45f, 0.3f);
@@ -283,7 +286,7 @@ void UPuzzleHUDWidget::BuildHUD()
 		BgSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 	UHorizontalBox* ComboRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	ComboText = MakeText(TEXT("TREAT! x1!"), false, 34.f, FLinearColor(1.f, 0.75f, 0.95f), 3.f);
+	ComboText = MakeText(TEXT("COMBO x1!"), false, 34.f, FLinearColor(1.f, 0.75f, 0.95f), 3.f);
 	ComboRow->AddChildToHorizontalBox(ComboText)->SetVerticalAlignment(VAlign_Center);
 	for (int32 Pip = 0; Pip < UPuzzleManager::ComboWindowMoves; ++Pip)
 	{
@@ -426,6 +429,31 @@ void UPuzzleHUDWidget::BuildHUD()
 		RelicBadges.Add(Holder);
 	}
 
+	// ---- Trick-or-Treat packet (bottom-left, above Holy Light): appears when one is waiting ----
+	{
+		UOverlay* Face = WidgetTree->ConstructWidget<UOverlay>();
+		UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>();
+		PacketIcon = MakeIcon(IconStar, Pumpkin, 74.f, 1.f, 0.8f);
+		Column->AddChildToVerticalBox(PacketIcon)->SetHorizontalAlignment(HAlign_Center);
+		Column->AddChildToVerticalBox(MakeText(TEXT("TRICK OR"), false, 28.f, FLinearColor(1.f, 0.85f, 0.6f), 3.f))->SetHorizontalAlignment(HAlign_Center);
+		Column->AddChildToVerticalBox(MakeText(TEXT("TREAT?"), false, 34.f, FLinearColor(1.f, 0.85f, 0.6f), 3.f))->SetHorizontalAlignment(HAlign_Center);
+		if (UOverlaySlot* ColumnSlot = Face->AddChildToOverlay(Column))
+		{
+			ColumnSlot->SetHorizontalAlignment(HAlign_Center);
+			ColumnSlot->SetVerticalAlignment(VAlign_Center);
+		}
+		UButton* Button = MakeButton(Face, FVector2D(210.f, 210.f), Pumpkin * 0.55f, Pumpkin2, ActPacket);
+		UWidget* Holder = Sized(Button, FVector2D(210.f, 210.f));
+		Holder->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+		Holder->SetVisibility(ESlateVisibility::Collapsed);
+		PacketButton = Holder;
+		UCanvasPanelSlot* PacketSlot = RootCanvas->AddChildToCanvas(Holder);
+		PacketSlot->SetAnchors(FAnchors(0.f, 1.f));
+		PacketSlot->SetAlignment(FVector2D(0.f, 1.f));
+		PacketSlot->SetPosition(FVector2D(30.f, -270.f));
+		PacketSlot->SetAutoSize(true);
+	}
+
 	// ---- Hint line (bottom centre, between the relics) ----
 	HintText = MakeText(TEXT(""), false, 30.f, Lavender, 3.f);
 	HintText->SetAutoWrapText(true);
@@ -506,6 +534,11 @@ void UPuzzleHUDWidget::ShowCard(EPuzzleCard Card)
 {
 	CurrentCard = Card;
 	CardAge = 0.f;
+	if (Card != EPuzzleCard::Trick)
+	{
+		WheelSegment = -1;
+		WheelSpinner = nullptr;
+	}
 	if (Card == EPuzzleCard::None)
 	{
 		CardLayer->SetVisibility(ESlateVisibility::Collapsed);
@@ -626,6 +659,119 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 44.f);
 		break;
 	}
+	case EPuzzleCard::Packet:
+	{
+		Add(MakeText(TEXT("Trick or"), true, 64.f, Pumpkin, 6.f));
+		Add(MakeText(TEXT("Treat?"), true, 96.f, Gold, 7.f), -20.f);
+		Add(MakeText(TEXT("someone is knocking at the door..."), false, 32.f, Lavender, 3.f), 4.f);
+		Add(ButtonRow(Btn(TEXT("TREAT"), FVector2D(320.f, 150.f), Emerald, Emerald2, ActTreat), Btn(TEXT("TRICK"), FVector2D(320.f, 150.f), Ruby, Ruby2, ActTrick)), 40.f);
+		UTextBlock* Explain = MakeText(TEXT("treat: buy luck, a tile or a relic\ntrick: spin the wheel of fortunes"), false, 28.f, FLinearColor(0.9f, 0.86f, 1.f), 3.f);
+		Explain->SetJustification(ETextJustify::Center);
+		Add(Explain, 16.f);
+		Add(Btn(TEXT("LATER"), FVector2D(300.f, 96.f), Amethyst, Amethyst2, ActPacketLater), 30.f);
+		break;
+	}
+	case EPuzzleCard::Treat:
+	{
+		Add(MakeText(TEXT("Treat!"), true, 72.f, Gold, 6.f));
+		const TArray<FTreatOffer>& Offers = UTrickOrTreat::Offers();
+		for (int32 Index = 0; Index < Offers.Num(); ++Index)
+		{
+			const FTreatOffer& Offer = Offers[Index];
+			if (Index == 0 || Offer.bBundle != Offers[Index - 1].bBundle)
+			{
+				Add(MakeText(Offer.bBundle ? TEXT("HALLOWEEN BUNDLES") : TEXT("SINGLE TREATS"), true, 30.f, Offer.bBundle ? Pumpkin : Lavender, 3.f), Index == 0 ? 18.f : 22.f);
+			}
+			UOverlay* Face = WidgetTree->ConstructWidget<UOverlay>();
+			UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+			UVerticalBox* Words = WidgetTree->ConstructWidget<UVerticalBox>();
+			Words->AddChildToVerticalBox(MakeText(Offer.Title, false, 34.f, FLinearColor::White, 4.f));
+			Words->AddChildToVerticalBox(MakeText(Offer.Detail, false, 22.f, FLinearColor(0.85f, 1.f, 0.85f), 3.f));
+			UHorizontalBoxSlot* WordsSlot = Row->AddChildToHorizontalBox(Words);
+			WordsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			WordsSlot->SetVerticalAlignment(VAlign_Center);
+			Row->AddChildToHorizontalBox(MakeText(Offer.Price, false, 38.f, PaleGold, 4.f))->SetVerticalAlignment(VAlign_Center);
+			if (UOverlaySlot* RowSlot = Face->AddChildToOverlay(Row))
+			{
+				RowSlot->SetHorizontalAlignment(HAlign_Fill);
+				RowSlot->SetVerticalAlignment(VAlign_Center);
+				RowSlot->SetPadding(FMargin(40.f, 0.f, 40.f, 6.f));
+			}
+			const FVector2D Size(740.f, 96.f);
+			Add(Sized(MakeButton(Face, Size, Offer.bBundle ? Pumpkin * 0.5f : Emerald, Offer.bBundle ? Pumpkin2 : Emerald2, ActBuyTreat, Index), Size), 8.f);
+		}
+		if (GameMode && GameMode->TrickOrTreat && GameMode->TrickOrTreat->IsTestStore())
+		{
+			Add(MakeText(TEXT("test store: no money is taken"), false, 26.f, Lavender, 3.f), 14.f);
+		}
+		Add(Btn(TEXT("BACK"), FVector2D(300.f, 96.f), Amethyst, Amethyst2, ActPacket), 22.f);
+		break;
+	}
+	case EPuzzleCard::Trick:
+	{
+		Add(MakeText(TEXT("Trick!"), true, 84.f, FLinearColor(1.f, 0.3f, 0.25f), 6.f));
+
+		// The wheel: a round panel, eight fortunes round its rim (good in green, bad in red) and spokes between
+		// them. It turns as one; the pointer above it stays put.
+		UOverlay* Wheel = WidgetTree->ConstructWidget<UOverlay>();
+		UImage* Disc = MakePanel(PanelFill * 1.8f, PanelFill2, Rim, 1.f, 0.5f, 0.45f);
+		if (UOverlaySlot* DiscSlot = Wheel->AddChildToOverlay(Disc))
+		{
+			DiscSlot->SetHorizontalAlignment(HAlign_Fill);
+			DiscSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+		UCanvasPanel* WheelFace = WidgetTree->ConstructWidget<UCanvasPanel>();
+		if (UOverlaySlot* FaceSlot = Wheel->AddChildToOverlay(WheelFace))
+		{
+			FaceSlot->SetHorizontalAlignment(HAlign_Fill);
+			FaceSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+		for (int32 Segment = 0; Segment < UTrickOrTreat::SegmentCount; ++Segment)
+		{
+			const float Angle = 360.f / UTrickOrTreat::SegmentCount * Segment;
+			UImage* Spoke = MakePanel(Rim, Rim * 0.4f, Rim, 0.05f, 0.5f, 0.3f);
+			UCanvasPanelSlot* SpokeSlot = WheelFace->AddChildToCanvas(Spoke);
+			SpokeSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+			SpokeSlot->SetAlignment(FVector2D(0.5f, 1.f));
+			SpokeSlot->SetSize(FVector2D(6.f, 250.f));
+			Spoke->SetRenderTransformPivot(FVector2D(0.5f, 1.f));
+			Spoke->SetRenderTransformAngle(Angle + 180.f / UTrickOrTreat::SegmentCount);
+
+			const bool bGood = UTrickOrTreat::IsGoodSegment(Segment);
+			UTextBlock* Label = MakeText(UTrickOrTreat::SegmentLabel(Segment), false, 21.f, bGood ? LuckGreen : FLinearColor(1.f, 0.35f, 0.3f), 4.f);
+			UCanvasPanelSlot* LabelSlot = WheelFace->AddChildToCanvas(Label);
+			LabelSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+			LabelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+			LabelSlot->SetAutoSize(true);
+			const float Radians = FMath::DegreesToRadians(Angle);
+			LabelSlot->SetPosition(FVector2D(FMath::Sin(Radians), -FMath::Cos(Radians)) * 185.f);
+			Label->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+			Label->SetRenderTransformAngle(Angle);
+		}
+		UImage* Hub = MakeIcon(IconMoon, Pumpkin, 96.f, 1.f, 0.8f);
+		if (UOverlaySlot* HubSlot = Wheel->AddChildToOverlay(Hub))
+		{
+			HubSlot->SetHorizontalAlignment(HAlign_Center);
+			HubSlot->SetVerticalAlignment(VAlign_Center);
+		}
+		WheelSpinner = Sized(Wheel, FVector2D(540.f, 540.f));
+		WheelSpinner->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+		WheelSpinner->SetRenderTransformAngle(0.f);
+
+		UOverlay* Stand = WidgetTree->ConstructWidget<UOverlay>();
+		Stand->AddChildToOverlay(WheelSpinner);
+		UImage* Pointer = MakeIcon(IconStar, Gold, 70.f, 1.f, 1.2f);
+		if (UOverlaySlot* PointerSlot = Stand->AddChildToOverlay(Pointer))
+		{
+			PointerSlot->SetHorizontalAlignment(HAlign_Center);
+			PointerSlot->SetVerticalAlignment(VAlign_Top);
+			PointerSlot->SetPadding(FMargin(0.f, -34.f, 0.f, 0.f));
+		}
+		Add(Stand, 30.f);
+		WheelResult = MakeText(TEXT(" "), false, 36.f, PaleGold, 4.f);
+		Add(WheelResult, 22.f);
+		break;
+	}
 	case EPuzzleCard::GameOver:
 	{
 		const bool bOutOfMoves = Rules && Rules->IsOutOfMoves();
@@ -690,6 +836,11 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 	case ActHoly:    GameMode->RequestRelic(ERelic::HolyLight); break;
 	case ActReroll:  GameMode->RequestRelic(ERelic::Reroll); break;
 	case ActHowTo:   ShowTutorial(); break;
+	case ActPacket:  GameMode->OpenPacket(); break;
+	case ActTreat:   GameMode->ChooseTreat(); break;
+	case ActTrick:   GameMode->ChooseTrick(); break;
+	case ActPacketLater: GameMode->ClosePacket(); break;
+	case ActBuyTreat: GameMode->BuyTreat(Param); break;
 	case ActTutorial:
 		if (Param < 0)
 		{
@@ -721,7 +872,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	Pages.Add({ TEXT("The Rite"),
 	  { { IconLine, Cyan, TEXT("ROUTE") } },
 	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each hand pointing at the next. It must START on a tile at the edge pointing straight away from that side, and END on a tile at an edge pointing straight out of it.\n\n")
-	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed circuit, a TRICK: it scores nothing and costs one step of your combo.\n\n")
+	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed CIRCUIT: it scores nothing and costs one step of your combo.\n\n")
 	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.") });
 	if (UPuzzleManager::bMoveBudgetEnabled)
 	{
@@ -740,8 +891,8 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{
 		Pages.Add({ TEXT("Combos"),
-		  { { IconStar, PaleGold, TEXT("TREAT") } },
-		  TEXT("Clear routes on following moves to build a TREAT combo: your route points are multiplied by it. Several routes at once climb it faster.\n\n")
+		  { { IconStar, PaleGold, TEXT("COMBO") } },
+		  TEXT("Clear routes on following moves to build a COMBO: your route points are multiplied by it. Several routes at once climb it faster.\n\n")
 		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.") });
 	}
 	if (TutorialRules && TutorialRules->bRelicsEnabled)
@@ -756,6 +907,14 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 		  { { IconMoon, LuckGreen, TEXT("LUCK") } },
 		  TEXT("Every combo step gathers +6 LUCK. Relics spend it: Holy Light -20, Reroll -12.\n\n")
 		  TEXT("The candles burn with your luck. Let it die, and the things in the dark wake.") });
+	}
+	if (TutorialRules && TutorialRules->bRelicsEnabled)
+	{
+		Pages.Add({ TEXT("Trick or Treat"),
+		  { { IconStar, Pumpkin, TEXT("TREAT") }, { IconReroll, Danger, TEXT("TRICK") } },
+		  TEXT("Every 300 points someone knocks: a TRICK OR TREAT packet appears by your relics. Tap it.\n\n")
+		  TEXT("TREAT: buy a single treat (Lucky Candle, Sugar Skull, Holy Light) or a Halloween bundle (Witch's Brew, Pumpkin Patch, Haunted Hoard).\n")
+		  TEXT("TRICK: spin the wheel for free. Half its fortunes help (luck, a reroll, a double clear, a pumpkin), half hurt (lost luck, a stray tile, a half clear, a broken combo).") });
 	}
 	TutorialPage = FMath::Clamp(TutorialPage, 0, Pages.Num() - 1);
 	const FPage& Page = Pages[TutorialPage];
@@ -864,7 +1023,7 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 	{
 		if (Result.CircuitCells > 0)
 		{
-			AddPopup(MakeText(TEXT("Trick!"), false, 96.f, FLinearColor(0.85f, 0.5f, 1.f), 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
+			AddPopup(MakeText(TEXT("Circuit!"), false, 96.f, FLinearColor(0.85f, 0.5f, 1.f), 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
 		}
 	}
 	else
@@ -875,7 +1034,7 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 		AddPopup(MakeText(Words[Tier], false, 96.f + 12.f * Tier, Colors[Tier], 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
 		if (Result.Circuits > 0)
 		{
-			AddPopup(MakeText(TEXT("Trick!"), false, 60.f, FLinearColor(0.85f, 0.5f, 1.f), 5.f), FVector2D(0.5f, 0.38f), 1.4f, 1.f, 0.3f);
+			AddPopup(MakeText(TEXT("Circuit!"), false, 60.f, FLinearColor(0.85f, 0.5f, 1.f), 5.f), FVector2D(0.5f, 0.38f), 1.4f, 1.f, 0.3f);
 		}
 	}
 
@@ -906,7 +1065,7 @@ void UPuzzleHUDWidget::ShowComboBroken(int32 LostCombo)
 {
 	if (LostCombo >= 2)
 	{
-		AddPopup(MakeText(FString::Printf(TEXT("treat x%d lost"), LostCombo), false, 40.f, FLinearColor(0.55f, 0.5f, 0.65f), 3.f),
+		AddPopup(MakeText(FString::Printf(TEXT("combo x%d lost"), LostCombo), false, 40.f, FLinearColor(0.55f, 0.5f, 0.65f), 3.f),
 			ComboAnchorFraction + FVector2D(0.f, 70.f / FMath::Max(CanvasSize.Y, 1.f)), 1.2f, 1.f, 0.f, -50.f);
 	}
 }
@@ -914,6 +1073,44 @@ void UPuzzleHUDWidget::ShowComboBroken(int32 LostCombo)
 void UPuzzleHUDWidget::ShowBonusSpawned(const FVector& WorldLocation)
 {
 	AddWorldPopup(MakeText(TEXT("BONUS TILE"), true, 40.f, UIStyle::PaleGold, 4.f), WorldLocation + FVector(0.f, 0.f, 60.f), 1.4f);
+}
+
+void UPuzzleHUDWidget::ShowPacketArrived()
+{
+	AddPopup(MakeText(TEXT("Trick or Treat?"), true, 64.f, UIStyle::Pumpkin, 6.f), FVector2D(0.5f, 0.24f), 2.2f, 1.f);
+	PacketPop = 1.f;
+}
+
+void UPuzzleHUDWidget::ShowTreatBought(int32 Offer)
+{
+	const TArray<FTreatOffer>& Offers = UTrickOrTreat::Offers();
+	if (!Offers.IsValidIndex(Offer))
+	{
+		return;
+	}
+	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>();
+	Column->AddChildToVerticalBox(MakeText(TEXT("Treat!"), true, 72.f, UIStyle::Gold, 6.f))->SetHorizontalAlignment(HAlign_Center);
+	Column->AddChildToVerticalBox(MakeText(Offers[Offer].Title + TEXT(":  ") + Offers[Offer].Detail, false, 44.f, UIStyle::LuckGreen, 4.f))->SetHorizontalAlignment(HAlign_Center);
+	AddPopup(Column, FVector2D(0.5f, 0.26f), 2.2f, 1.f);
+}
+
+void UPuzzleHUDWidget::ShowWheel(int32 Segment)
+{
+	ShowCard(EPuzzleCard::Trick);
+	WheelSegment = Segment;
+	WheelAge = 0.f;
+	bWheelDone = false;
+}
+
+void UPuzzleHUDWidget::ShowTrickResult(int32 Segment, const FString& Line)
+{
+	const bool bGood = UTrickOrTreat::IsGoodSegment(Segment);
+	if (WheelResult)
+	{
+		WheelResult->SetText(FText::FromString(Line));
+		WheelResult->SetColorAndOpacity(FSlateColor(bGood ? UIStyle::LuckGreen : FLinearColor(1.f, 0.4f, 0.32f)));
+	}
+	AddPopup(MakeText(bGood ? TEXT("Lucky!") : TEXT("Tricked!"), false, 110.f, bGood ? UIStyle::LuckGreen : UIStyle::Danger, 7.f), FVector2D(0.5f, 0.16f), 1.6f, 1.f);
 }
 
 void UPuzzleHUDWidget::ShowRelicGained(ERelic Relic)
@@ -1072,7 +1269,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	ComboBadge->SetVisibility(bShowCombo ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (bShowCombo)
 	{
-		ComboText->SetText(FText::FromString(FString::Printf(TEXT("TREAT! x%d!"), Combo)));
+		ComboText->SetText(FText::FromString(FString::Printf(TEXT("COMBO x%d!"), Combo)));
 		const bool bDanger = Rules->ComboWindow <= 1;
 		const float Wobble = bDanger ? FMath::Sin(Time * 30.f) * 3.f : 0.f;
 		FWidgetTransform Transform;
@@ -1115,6 +1312,39 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		}
 	}
 	MenuButton->SetVisibility(bPlayingView ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+
+	// Trick-or-Treat: the packet button bobs and glows while one waits; the wheel spins down to its fortune.
+	const bool bPacketWaiting = GameMode->TrickOrTreat && GameMode->TrickOrTreat->IsAvailable() && !GameMode->bPacketOpen && GameMode->Flow == EPuzzleFlow::Playing;
+	PacketButton->SetVisibility(bPacketWaiting ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	PacketPop = FMath::Max(PacketPop - InDeltaTime * 1.5f, 0.f);
+	if (bPacketWaiting)
+	{
+		FWidgetTransform Transform;
+		Transform.Scale = FVector2D(1.f + 0.06f * FMath::Sin(Time * 5.f) + 0.4f * PacketPop * PacketPop);
+		Transform.Angle = 4.f * FMath::Sin(Time * 2.6f);
+		PacketButton->SetRenderTransform(Transform);
+		if (UMaterialInstanceDynamic* MID = PacketIcon->GetDynamicMaterial())
+		{
+			MID->SetScalarParameterValue(TEXT("Glow"), 0.8f + 0.6f * FMath::Sin(Time * 5.f) + 1.5f * PacketPop);
+		}
+	}
+	if (CurrentCard == EPuzzleCard::Trick && WheelSegment >= 0 && WheelSpinner)
+	{
+		WheelAge += InDeltaTime;
+		const float T = FMath::Min(WheelAge / WheelSpinSeconds, 1.f);
+		const float Eased = 1.f - FMath::Pow(1.f - T, 3.f);
+		// Five whole turns, then the chosen segment comes to rest under the pointer.
+		const float Final = 360.f * 5.f - 360.f / UTrickOrTreat::SegmentCount * WheelSegment;
+		WheelSpinner->SetRenderTransformAngle(Final * Eased);
+		if (T >= 1.f && !bWheelDone)
+		{
+			bWheelDone = true;
+			if (APuzzleGameMode* SpinMode = GetGameMode())
+			{
+				SpinMode->FinishTrick(WheelSegment);
+			}
+		}
+	}
 
 	// Luck: eased number and bar, pops with a floating +/- whenever it changes.
 	const int32 LuckNow = Rules->GetLuck();
@@ -1174,6 +1404,11 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	{
 		Hint = TEXT("Tap the board to call down Holy Light");
 		HintColor = PaleGold;
+	}
+	else if (bPacketWaiting)
+	{
+		Hint = TEXT("Someone is knocking: open the packet");
+		HintColor = FLinearColor(1.f, 0.6f, 0.2f);
 	}
 	else if (GameMode->Flow == EPuzzleFlow::Playing && Rules->IsStuck())
 	{

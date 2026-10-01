@@ -94,6 +94,22 @@ public:
 	int32 GetRelicCharges(ERelic Relic) const { return RelicCharges[static_cast<int32>(Relic)]; }
 
 	int32 GetLuck() const { return Luck; }
+
+	// --- Trick-or-Treat packet effects (UTrickOrTreat) ---
+	void GrantLuck(int32 Delta) { AddLuck(Delta); }
+	// +1 charge of Relic (up to the cap), announced like a combo reward.
+	void GrantRelic(ERelic Relic);
+	// The next placement that clears a route has its route points multiplied by this (then it is back to 1).
+	float NextClearMultiplier = 1.f;
+	// A fresh tray for free (the Reroll relic without its charge or luck cost).
+	void FreeReroll();
+	// A pumpkin bonus tile drops on the board, whatever the Bonus tiles option says.
+	bool SummonPumpkin();
+	// A single stray tile drops on the board where it clears nothing.
+	bool DropStrayTile();
+	// The combo ends at once.
+	void BreakCombo();
+
 	int32 Score = 0;
 	int32 ComboStreak = 0;
 	// Placements left before the combo breaks (shown as pips).

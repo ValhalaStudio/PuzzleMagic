@@ -31,7 +31,10 @@ enum class EPuzzleCard : uint8
 	Tutorial,
 	Pause,
 	Courses,
-	Options
+	Options,
+	Packet,   // Trick or treat?
+	Treat,    // the treat shop
+	Trick     // the wheel
 };
 
 // Buttons never take keyboard focus, so game keys keep reaching the player controller after a click.
@@ -76,6 +79,12 @@ public:
 	void ShowComboBroken(int32 LostCombo);
 	void ShowRelicGained(ERelic Relic);
 	void ShowBonusSpawned(const FVector& WorldLocation);
+	// Trick-or-Treat packet (UTrickOrTreat).
+	void ShowPacketArrived();
+	void ShowTreatBought(int32 Offer);
+	// Opens the wheel card and spins it to Segment; it calls APuzzleGameMode::FinishTrick when it stops.
+	void ShowWheel(int32 Segment);
+	void ShowTrickResult(int32 Segment, const FString& Line);
 	void ResetRound();
 
 	// The "How to play" pages, from Page (0-based).
@@ -93,7 +102,9 @@ private:
 	{
 		ActPlay, ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
 		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus,
-		ActCourse   // Param = width * 10 + height
+		ActCourse,  // Param = width * 10 + height
+		ActPacket, ActTreat, ActTrick, ActPacketLater,
+		ActBuyTreat // Param = offer index
 	};
 
 	void BuildTutorialPage();
@@ -177,6 +188,16 @@ private:
 	UPROPERTY() TObjectPtr<UWidget> CardPanel;
 	UPROPERTY() TObjectPtr<UVerticalBox> CardContent;
 	UPROPERTY() TArray<TObjectPtr<UWidget>> CardStars;
+	UPROPERTY() TObjectPtr<UWidget> PacketButton;
+	UPROPERTY() TObjectPtr<UImage> PacketIcon;
+	UPROPERTY() TObjectPtr<UWidget> WheelSpinner;
+	UPROPERTY() TObjectPtr<UTextBlock> WheelResult;
+	float PacketPop = 0.f;
+	// The wheel: where it will stop (-1 = not spinning), how long it has turned, whether it has reported.
+	int32 WheelSegment = -1;
+	float WheelAge = 0.f;
+	bool bWheelDone = false;
+	static constexpr float WheelSpinSeconds = 3.4f;
 
 	TArray<FPopup> Popups;
 	EPuzzleCard CurrentCard = EPuzzleCard::None;

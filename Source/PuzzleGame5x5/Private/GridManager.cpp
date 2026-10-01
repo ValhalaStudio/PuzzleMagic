@@ -1270,6 +1270,51 @@ void AGridManager::RerollTray()
 	}
 }
 
+void AGridManager::GiveReservePiece(const FPuzzlePieceShape& Piece)
+{
+	Tray[ReserveSlot] = Piece;
+	TraySlotUsed[ReserveSlot] = false;
+	RefreshTrayVisuals();
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	if (APuzzleFX* FX = GetWorld()->SpawnActor<APuzzleFX>(APuzzleFX::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, SpawnParams))
+	{
+		FX->AddRing(GetTrayAnchorWorldLocation(ReserveSlot) + FVector(0.f, 0.f, 20.f), 120.f, FLinearColor(1.f, 0.55f, 0.1f) * 2.f, 0.f);
+	}
+}
+
+bool AGridManager::DropStrayTile(FIntPoint& OutCell)
+{
+	FPuzzlePieceShape Stray = PieceLibrary::MakeRandomPieceRandomColor();
+	Stray.Cells = { FIntPoint(0, 0) };
+	Stray.Dirs = { static_cast<EPuzzleDir>(FMath::RandRange(0, 3)) };
+
+	// Like a bonus tile: never where it would score, never where the tray would be left with nowhere to go.
+	TArray<int32> Choices;
+	for (int32 Candidate = 0; Candidate < Filled.Num(); ++Candidate)
+	{
+		if (Filled[Candidate] || SimulateLinesCleared(Stray, Candidate % GridWidth, Candidate / GridWidth) > 0)
+		{
+			continue;
+		}
+		Filled[Candidate] = true;
+		const bool bStuck = !CanAnyTrayPieceFit();
+		Filled[Candidate] = false;
+		if (!bStuck)
+		{
+			Choices.Add(Candidate);
+		}
+	}
+	if (Choices.Num() == 0)
+	{
+		return false;
+	}
+	const int32 Index = Choices[FMath::RandRange(0, Choices.Num() - 1)];
+	OutCell = FIntPoint(Index % GridWidth, Index / GridWidth);
+	return PlacePieceAt(Stray, OutCell.X, OutCell.Y);
+}
+
 bool AGridManager::ParkPiece(int32 SlotIndex)
 {
 	if (SlotIndex < 0 || SlotIndex >= TraySize || TraySlotUsed[SlotIndex])

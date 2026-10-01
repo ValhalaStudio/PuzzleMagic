@@ -25,6 +25,7 @@ void UPuzzleManager::StartGame()
 	Luck = StartingLuck;
 	NextBasicBonusScore = BasicBonusEvery;
 	NextPairBonusScore = PairBonusEvery;
+	NextClearMultiplier = 1.f;
 }
 
 bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
@@ -64,7 +65,8 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 		}
 
 		const int32 Multiplier = bComboEnabled ? ComboStreak : 1;
-		RoundScore += RoutesPoints(Result.Routes) * Multiplier;
+		RoundScore += FMath::RoundToInt(RoutesPoints(Result.Routes) * Multiplier * NextClearMultiplier);
+		NextClearMultiplier = 1.f;
 
 		if (bMoveBudgetEnabled)
 		{
@@ -170,6 +172,59 @@ bool UPuzzleManager::UseReroll()
 	GridManager->RerollTray();
 	CheckForEnd();
 	return true;
+}
+
+void UPuzzleManager::GrantRelic(ERelic Relic)
+{
+	int32& Charges = RelicCharges[static_cast<int32>(Relic)];
+	if (bRelicsEnabled && Charges < MaxRelicCharges)
+	{
+		++Charges;
+		OnRelicGained.Broadcast(Relic);
+	}
+}
+
+void UPuzzleManager::FreeReroll()
+{
+	if (GridManager && !bFinished)
+	{
+		GridManager->RerollTray();
+		CheckForEnd();
+	}
+}
+
+bool UPuzzleManager::SummonPumpkin()
+{
+	FIntPoint Cell;
+	if (!GridManager || bFinished || GridManager->CountBonusTiles(EPuzzleBonus::Basic) >= MaxBasicBonusTiles || !GridManager->SpawnBonusTile(EPuzzleBonus::Basic, Cell))
+	{
+		return false;
+	}
+	OnBonusSpawned.Broadcast(Cell);
+	return true;
+}
+
+bool UPuzzleManager::DropStrayTile()
+{
+	FIntPoint Cell;
+	if (!GridManager || bFinished || !GridManager->DropStrayTile(Cell))
+	{
+		return false;
+	}
+	CheckForEnd();
+	return true;
+}
+
+void UPuzzleManager::BreakCombo()
+{
+	if (ComboStreak > 0)
+	{
+		const int32 Lost = ComboStreak;
+		ComboStreak = 0;
+		ComboWindow = 0;
+		NextRelicCombo = RelicComboStep;
+		OnComboBroken.Broadcast(Lost);
+	}
 }
 
 int32 UPuzzleManager::RoutesPoints(const TArray<FRouteInfo>& Routes)

@@ -140,6 +140,11 @@ public:
 	void RefillTrayIfEmpty();
 	void ConsumeTraySlot(int32 SlotIndex);
 	void RerollTray();
+	// Trick-or-Treat: puts Piece in the hold slot (whatever was there is gone), with the reroll's ring.
+	void GiveReservePiece(const FPuzzlePieceShape& Piece);
+	// Trick-or-Treat's stray tile: a single random tile dropped on an empty cell where it clears nothing and
+	// leaves room for a tray piece. False when there is no such cell.
+	bool DropStrayTile(FIntPoint& OutCell);
 
 	// Moves a regular tray piece into the reserve (swapping if the reserve is occupied).
 	bool ParkPiece(int32 SlotIndex);
