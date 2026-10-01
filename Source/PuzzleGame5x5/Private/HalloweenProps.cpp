@@ -5,6 +5,10 @@
 #include "Materials/MaterialInterface.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Engine.h"
 
 namespace
 {
@@ -35,6 +39,7 @@ UStaticMeshComponent* AHalloweenProps::AddPart(UStaticMesh* Mesh, const FVector&
 	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Component->SetCastShadow(bCastShadow);
 	Component->RegisterComponent();
+	Owned.Add(Component);
 	Component->SetWorldLocation(GetActorLocation() + Location);
 	Component->SetWorldScale3D(Scale);
 	if (Material)
@@ -54,9 +59,63 @@ void AHalloweenProps::BeginPlay()
 	BatMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_BatSilhouette.M_BatSilhouette"));
 	FacingCamera = FRotationMatrix::MakeFromZX(TowardCamera, FVector(1.f, 0.f, 0.f)).Rotator();
 
+	BuildAll();
+}
+
+void AHalloweenProps::BuildAll()
+{
 	BuildCauldron(-1.f);
 	BuildCauldron(1.f);
 	BuildBats();
+}
+
+void AHalloweenProps::ClearAll()
+{
+	for (UActorComponent* Component : Owned)
+	{
+		if (Component)
+		{
+			Component->DestroyComponent();
+		}
+	}
+	Owned.Reset();
+	Puffs.Reset();
+	Bubbles.Reset();
+	Bats.Reset();
+	Cauldrons.Reset();
+}
+
+void AHalloweenProps::FitToCamera()
+{
+	APlayerController* Controller = UGameplayStatics::GetPlayerController(this, 0);
+	FVector2D Viewport(0.f, 0.f);
+	if (!Controller || !GEngine || !GEngine->GameViewport)
+	{
+		return;
+	}
+	GEngine->GameViewport->GetViewportSize(Viewport);
+	if (Viewport.X <= 0.f || Viewport.Y <= 0.f)
+	{
+		return;
+	}
+
+	// On the 8x8 board the cauldron stands at about 12% across and 41% down the screen: keep it there.
+	FVector Origin, Direction;
+	if (!Controller->DeprojectScreenPositionToWorld(Viewport.X * 0.123f, Viewport.Y * 0.41f, Origin, Direction) || FMath::Abs(Direction.Z) < 0.01f)
+	{
+		return;
+	}
+	const FVector Hit = Origin + Direction * (-Origin.Z / Direction.Z);
+	const float NewX = FMath::Abs(Hit.X);
+	if (NewX < 50.f || FMath::IsNearlyEqual(NewX, CauldronX, CauldronX * 0.03f))
+	{
+		return;
+	}
+	CauldronScale = 0.85f * NewX / 780.f;
+	CauldronX = NewX;
+	CauldronY = Hit.Y;
+	ClearAll();
+	BuildAll();
 }
 
 void AHalloweenProps::BuildCauldron(float Side)
@@ -119,11 +178,12 @@ void AHalloweenProps::BuildCauldron(float Side)
 	UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
 	Light->SetupAttachment(RootComponent);
 	Light->RegisterComponent();
+	Owned.Add(Light);
 	Light->SetWorldLocation(GetActorLocation() + Base + FVector(0.f, -40.f, 250.f * S));
 	Light->SetIntensityUnits(ELightUnits::Candelas);
 	Light->SetLightColor(FLinearColor(0.45f, 1.f, 0.12f));
 	Light->SetIntensity(60.f);
-	Light->SetAttenuationRadius(520.f);
+	Light->SetAttenuationRadius(520.f * S / 0.85f);
 	Light->SetCastShadows(false);
 	FCauldron& Cauldron = Cauldrons.AddDefaulted_GetRef();
 	Cauldron.Light = Light;
@@ -136,27 +196,28 @@ void AHalloweenProps::BuildBats()
 	{
 		return;
 	}
-	// Six bats circle above the two cauldrons, two more cross the top of the scene.
+	// Six bats circle above the two cauldrons, two more cross the top of the scene. Everything scales with the cauldrons.
+	const float Fit = CauldronScale / 0.85f;
 	for (int32 I = 0; I < 8; ++I)
 	{
 		FBat& Bat = Bats.AddDefaulted_GetRef();
 		Bat.bCrossing = I >= 6;
 		if (Bat.bCrossing)
 		{
-			Bat.Center = FVector(0.f, -560.f + 40.f * (I - 6), 250.f + 70.f * (I - 6));
-			Bat.Radius = FVector(1250.f, 0.f, 50.f);
+			Bat.Center = FVector(0.f, (-560.f + 40.f * (I - 6)) * Fit, (250.f + 70.f * (I - 6)) * Fit);
+			Bat.Radius = FVector(1250.f, 0.f, 50.f) * Fit;
 			Bat.Speed = FMath::FRandRange(0.11f, 0.16f);
 		}
 		else
 		{
 			const float Side = (I % 2 == 0) ? -1.f : 1.f;
-			Bat.Center = FVector(Side * CauldronX, CauldronY - 30.f, 380.f + 50.f * (I / 2));
-			Bat.Radius = FVector(FMath::FRandRange(200.f, 290.f), FMath::FRandRange(90.f, 160.f), FMath::FRandRange(40.f, 90.f));
+			Bat.Center = FVector(Side * CauldronX, CauldronY - 30.f * Fit, (380.f + 50.f * (I / 2)) * Fit);
+			Bat.Radius = FVector(FMath::FRandRange(200.f, 290.f), FMath::FRandRange(90.f, 160.f), FMath::FRandRange(40.f, 90.f)) * Fit;
 			Bat.Speed = FMath::FRandRange(0.5f, 0.9f) * (FMath::RandBool() ? 1.f : -1.f);
 		}
 		Bat.Phase = FMath::FRandRange(0.f, 2.f * PI);
 		Bat.FlapRate = FMath::FRandRange(8.f, 12.f);
-		Bat.Size = FMath::FRandRange(105.f, 150.f);
+		Bat.Size = FMath::FRandRange(105.f, 150.f) * Fit;
 		Bat.Mesh = AddPart(PlaneMesh, Bat.Center, FVector(Bat.Size / 100.f), nullptr, false);
 		Bat.Mesh->SetWorldRotation(FacingCamera);
 		Bat.Mesh->SetMaterial(0, BatMaterial);
@@ -167,6 +228,11 @@ void AHalloweenProps::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Time += DeltaTime;
+	if (Time >= NextFitCheck)
+	{
+		NextFitCheck = Time + 0.5f;
+		FitToCamera();
+	}
 	const FVector Origin = GetActorLocation();
 
 	for (FBubble& Bubble : Bubbles)
@@ -192,7 +258,7 @@ void AHalloweenProps::Tick(float DeltaTime)
 			Puff.Drift = FMath::FRandRange(-70.f, 70.f);
 		}
 		const float U = Puff.Age / Puff.Life;
-		const FVector Location = Origin + Puff.Top + FVector(Puff.Drift * U + FMath::Sin(Time * 0.9f + Puff.Top.X) * 18.f * U, 0.f, 340.f * U);
+		const FVector Location = Origin + Puff.Top + FVector(Puff.Drift * U + FMath::Sin(Time * 0.9f + Puff.Top.X) * 18.f * U, 0.f, 340.f * CauldronScale / 0.85f * U);
 		Puff.Mesh->SetWorldLocation(Location);
 		const float Size = Puff.Size * (0.4f + 0.9f * U);
 		Puff.Mesh->SetWorldScale3D(FVector(Size / 100.f, Size / 100.f, 1.f));

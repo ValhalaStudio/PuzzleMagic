@@ -411,6 +411,28 @@ void AGridManager::HideGhostPreview()
 	GhostKey = FIntVector(MAX_int32);
 }
 
+bool AGridManager::IsRouteStarter(int32 X, int32 Y, EPuzzleDir Dir) const
+{
+	switch (Dir)
+	{
+	case EPuzzleDir::Up:    return Y == 0;
+	case EPuzzleDir::Right: return X == 0;
+	case EPuzzleDir::Down:  return Y == GridHeight - 1;
+	default:                return X == GridWidth - 1;
+	}
+}
+
+bool AGridManager::IsRouteEnder(int32 X, int32 Y, EPuzzleDir Dir) const
+{
+	switch (Dir)
+	{
+	case EPuzzleDir::Up:    return Y == GridHeight - 1;
+	case EPuzzleDir::Right: return X == GridWidth - 1;
+	case EPuzzleDir::Down:  return Y == 0;
+	default:                return X == 0;
+	}
+}
+
 void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells) const
 {
 	OutRoutes.Reset();
@@ -467,8 +489,9 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		}
 	}
 
-	// Walk from every tile on the board's edge until a tile points off the board. The sides are
-	// Left, Right, Bottom, Top (0 to 3); the side a chain leaves through is set by its last tile.
+	// Walk from every route starter until a tile points off the board. The sides are
+	// Left, Right, Bottom, Top (0 to 3); the side a chain begins at is the one its starter points away from,
+	// and the side it leaves through is the one its ender points at.
 	enum { SideLeft, SideRight, SideBottom, SideTop };
 	auto Opposite = [](int32 Side) { return Side ^ 1; };
 
@@ -478,7 +501,7 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 	{
 		const int32 SX = Start % GridWidth;
 		const int32 SY = Start / GridWidth;
-		if (!FilledState[Start] || (SX != 0 && SX != GridWidth - 1 && SY != 0 && SY != GridHeight - 1))
+		if (!FilledState[Start] || !IsRouteStarter(SX, SY, DirState[Start]))
 		{
 			continue;
 		}
@@ -514,19 +537,18 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		case EPuzzleDir::Down:  ExitSide = SideBottom; break;
 		case EPuzzleDir::Left:  ExitSide = SideLeft; break;
 		}
-		TArray<int32, TInlineAllocator<2>> StartSides;
-		if (SX == 0) { StartSides.Add(SideLeft); }
-		if (SX == GridWidth - 1) { StartSides.Add(SideRight); }
-		if (SY == 0) { StartSides.Add(SideBottom); }
-		if (SY == GridHeight - 1) { StartSides.Add(SideTop); }
-
-		bool bOpposite = false;
-		bool bNeighbouring = false;
-		for (int32 Side : StartSides)
+		// The side the starter points away from.
+		int32 StartSide = SideLeft;
+		switch (DirState[Start])
 		{
-			bOpposite |= ExitSide == Opposite(Side);
-			bNeighbouring |= ExitSide != Side && ExitSide != Opposite(Side);
+		case EPuzzleDir::Up:    StartSide = SideBottom; break;
+		case EPuzzleDir::Right: StartSide = SideLeft; break;
+		case EPuzzleDir::Down:  StartSide = SideTop; break;
+		case EPuzzleDir::Left:  StartSide = SideRight; break;
 		}
+
+		const bool bOpposite = ExitSide == Opposite(StartSide);
+		const bool bNeighbouring = ExitSide != StartSide && !bOpposite;
 
 		if (bOpposite || bNeighbouring)
 		{
@@ -738,7 +760,7 @@ void AGridManager::FindBonusEvents(TArray<FBonusEvent>& OutEvents) const
 		}
 		const int32 X = Index % GridWidth;
 		const int32 Y = Index / GridWidth;
-		if (X == 0 || X == GridWidth - 1 || Y == 0 || Y == GridHeight - 1)
+		if (IsRouteStarter(X, Y, CellDirs[Index]))
 		{
 			TArray<int32> Chain;
 			WalkForward(Index, Chain);

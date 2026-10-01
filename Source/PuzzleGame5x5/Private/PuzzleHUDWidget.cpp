@@ -720,7 +720,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	TArray<FPage> Pages;
 	Pages.Add({ TEXT("The Rite"),
 	  { { IconLine, Cyan, TEXT("ROUTE") } },
-	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each triangle pointing at the next, from one side of the board across to another and out.\n\n")
+	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each hand pointing at the next. It must START on a tile at the edge pointing straight away from that side, and END on a tile at an edge pointing straight out of it.\n\n")
 	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed circuit and scores nothing.\n\n")
 	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.") });
 	if (UPuzzleManager::bMoveBudgetEnabled)

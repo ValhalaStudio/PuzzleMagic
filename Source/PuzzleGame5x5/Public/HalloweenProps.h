@@ -23,7 +23,8 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-	// World X of the two cauldrons (left is minus).
+	// Where the two cauldrons stand (left is minus X) and how big they are. The defaults suit the 8x8 board; the actor
+	// re-fits them to the camera whenever the board size changes the framing.
 	UPROPERTY(EditAnywhere, Category = "Halloween")
 	float CauldronX = 780.f;
 
@@ -75,6 +76,16 @@ private:
 	UStaticMeshComponent* AddPart(UStaticMesh* Mesh, const FVector& Location, const FVector& Scale, UMaterialInterface* Material, bool bCastShadow);
 	void BuildCauldron(float Side);
 	void BuildBats();
+	void BuildAll();
+	void ClearAll();
+
+	// Looks where the left and right edges of the view meet the floor and rebuilds the scenery if they moved.
+	void FitToCamera();
+
+	UPROPERTY()
+	TArray<TObjectPtr<UActorComponent>> Owned;
+
+	float NextFitCheck = 0.f;
 
 	TArray<FPuff> Puffs;
 	TArray<FBubble> Bubbles;

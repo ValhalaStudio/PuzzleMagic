@@ -209,8 +209,14 @@ private:
 
 	bool IsValidCoord(int32 X, int32 Y) const;
 
-	// Finds the routes and the cells of closed circuits. A route leaves the board through the side opposite
-	// its first tile's side, or through a neighbouring side. A chain of two or more tiles that leaves through
+	// Route roles, from where a tile sits and which way it points. A starter sits next to a side of the board and
+	// points straight away from it; an ender sits next to a side and points straight at it.
+	// Only a starter can begin a route, and a route ends on an ender.
+	bool IsRouteStarter(int32 X, int32 Y, EPuzzleDir Dir) const;
+	bool IsRouteEnder(int32 X, int32 Y, EPuzzleDir Dir) const;
+
+	// Finds the routes and the cells of closed circuits. A route begins on a starter, follows the tiles and ends on an ender; it leaves
+	// the board through the side opposite its starter's side, or through a neighbouring side. A chain of two or more tiles that leaves through
 	// the side it started on counts as a closed circuit.
 	// Finds the bonus tiles that a chain clears right now: basic, outgoing, incoming and linked pairs.
 	// A bonus tile points nowhere: chains end on it, and a chain can leave it through any neighbour.
