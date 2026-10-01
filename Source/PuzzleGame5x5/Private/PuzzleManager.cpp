@@ -64,12 +64,7 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 		}
 
 		const int32 Multiplier = bComboEnabled ? ComboStreak : 1;
-		int32 ClearPoints = Result.Cells * 2 + Result.Lines * 15;
-		for (const FRouteInfo& Route : Result.Routes)
-		{
-			ClearPoints += RouteBonus(Route);
-		}
-		RoundScore += ClearPoints * Multiplier;
+		RoundScore += RoutesPoints(Result.Routes) * Multiplier;
 
 		if (bMoveBudgetEnabled)
 		{
@@ -89,6 +84,19 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 		ComboWindow = 0;
 		NextRelicCombo = RelicComboStep;
 		OnComboBroken.Broadcast(Lost);
+	}
+
+	// A trick (closed circuit) sours the combo: each one costs a step.
+	if (bComboEnabled && Result.Circuits > 0 && ComboStreak > 0)
+	{
+		const int32 Before = ComboStreak;
+		ComboStreak = FMath::Max(0, ComboStreak - Result.Circuits);
+		if (ComboStreak == 0)
+		{
+			ComboWindow = 0;
+			NextRelicCombo = RelicComboStep;
+			OnComboBroken.Broadcast(Before);
+		}
 	}
 
 	// Bonus tiles cleared by chains add their own points (never multiplied by the combo).
@@ -132,9 +140,9 @@ bool UPuzzleManager::UseHolyLight(int32 CenterX, int32 CenterY)
 	--Charges;
 	AddLuck(-HolyLightLuckCost);
 
+	// Holy Light ignores the combo and scores nothing: it only clears, and costs luck.
 	const FClearResult Result = GridManager->ClearArea(CenterX, CenterY, 0.05f);
-	const int32 Points = Result.Cells * 3;
-	Score += Points;
+	const int32 Points = 0;
 	LastRoundScore = Points;
 
 	FPuzzleClearEvent Event;
@@ -164,23 +172,34 @@ bool UPuzzleManager::UseReroll()
 	return true;
 }
 
-int32 UPuzzleManager::PowerBonus(int32 ExtraTiles, int32 Base)
+int32 UPuzzleManager::RoutesPoints(const TArray<FRouteInfo>& Routes)
 {
-	if (ExtraTiles <= 0)
+	int32 Points = 0;
+	for (int32 I = 0; I < Routes.Num(); ++I)
 	{
-		return 0;
+		Points += RoutePoints + RouteTilePoints * Routes[I].Cells.Num();
+		// Routes that share a tile (a merged tail, a crossing) each earn a bonus for every route cleared at once.
+		bool bShares = false;
+		for (int32 J = 0; J < Routes.Num() && !bShares; ++J)
+		{
+			if (J != I)
+			{
+				for (int32 Cell : Routes[I].Cells)
+				{
+					if (Routes[J].Cells.Contains(Cell))
+					{
+						bShares = true;
+						break;
+					}
+				}
+			}
+		}
+		if (bShares)
+		{
+			Points += SharedRoutePoints * Routes.Num();
+		}
 	}
-	int64 Bonus = 1;
-	for (int32 I = 0; I < ExtraTiles && Bonus < MaxRouteBonus; ++I)
-	{
-		Bonus *= Base;
-	}
-	return static_cast<int32>(FMath::Min<int64>(Bonus, MaxRouteBonus));
-}
-
-int32 UPuzzleManager::RouteBonus(const FRouteInfo& Route)
-{
-	return PowerBonus(Route.ExtraTiles, Route.bNeighbouring ? 5 : 10);
+	return Points;
 }
 
 int32 UPuzzleManager::BonusPoints(const FBonusEvent& Event)
@@ -189,7 +208,8 @@ int32 UPuzzleManager::BonusPoints(const FBonusEvent& Event)
 	{
 		return LinkedBonusPoints;
 	}
-	return (Event.Kind == EPuzzleBonus::Basic ? BasicBonusPoints : DirectionalBonusPoints) + PowerBonus(Event.ExtraTiles, 10);
+	// The chain's tiles, not counting the bonus tile itself.
+	return (Event.Kind == EPuzzleBonus::Basic ? BasicBonusPoints : DirectionalBonusPoints) + BonusChainTilePoints * FMath::Max(0, Event.Cells.Num() - 1);
 }
 
 void UPuzzleManager::SpawnDueBonusTiles()

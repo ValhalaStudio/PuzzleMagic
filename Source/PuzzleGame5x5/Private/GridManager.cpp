@@ -411,7 +411,29 @@ void AGridManager::HideGhostPreview()
 	GhostKey = FIntVector(MAX_int32);
 }
 
-void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells) const
+bool AGridManager::IsRouteStarter(int32 X, int32 Y, EPuzzleDir Dir) const
+{
+	switch (Dir)
+	{
+	case EPuzzleDir::Up:    return Y == 0;
+	case EPuzzleDir::Right: return X == 0;
+	case EPuzzleDir::Down:  return Y == GridHeight - 1;
+	default:                return X == GridWidth - 1;
+	}
+}
+
+bool AGridManager::IsRouteEnder(int32 X, int32 Y, EPuzzleDir Dir) const
+{
+	switch (Dir)
+	{
+	case EPuzzleDir::Up:    return Y == GridHeight - 1;
+	case EPuzzleDir::Right: return X == GridWidth - 1;
+	case EPuzzleDir::Down:  return Y == 0;
+	default:                return X == 0;
+	}
+}
+
+void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells, int32* OutCircuitCount) const
 {
 	OutRoutes.Reset();
 	OutCircuitCells.Reset();
@@ -467,8 +489,9 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		}
 	}
 
-	// Walk from every tile on the board's edge until a tile points off the board. The sides are
-	// Left, Right, Bottom, Top (0 to 3); the side a chain leaves through is set by its last tile.
+	// Walk from every route starter until a tile points off the board. The sides are
+	// Left, Right, Bottom, Top (0 to 3); the side a chain begins at is the one its starter points away from,
+	// and the side it leaves through is the one its ender points at.
 	enum { SideLeft, SideRight, SideBottom, SideTop };
 	auto Opposite = [](int32 Side) { return Side ^ 1; };
 
@@ -478,7 +501,7 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 	{
 		const int32 SX = Start % GridWidth;
 		const int32 SY = Start / GridWidth;
-		if (!FilledState[Start] || (SX != 0 && SX != GridWidth - 1 && SY != 0 && SY != GridHeight - 1))
+		if (!FilledState[Start] || !IsRouteStarter(SX, SY, DirState[Start]))
 		{
 			continue;
 		}
@@ -514,19 +537,18 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		case EPuzzleDir::Down:  ExitSide = SideBottom; break;
 		case EPuzzleDir::Left:  ExitSide = SideLeft; break;
 		}
-		TArray<int32, TInlineAllocator<2>> StartSides;
-		if (SX == 0) { StartSides.Add(SideLeft); }
-		if (SX == GridWidth - 1) { StartSides.Add(SideRight); }
-		if (SY == 0) { StartSides.Add(SideBottom); }
-		if (SY == GridHeight - 1) { StartSides.Add(SideTop); }
-
-		bool bOpposite = false;
-		bool bNeighbouring = false;
-		for (int32 Side : StartSides)
+		// The side the starter points away from.
+		int32 StartSide = SideLeft;
+		switch (DirState[Start])
 		{
-			bOpposite |= ExitSide == Opposite(Side);
-			bNeighbouring |= ExitSide != Side && ExitSide != Opposite(Side);
+		case EPuzzleDir::Up:    StartSide = SideBottom; break;
+		case EPuzzleDir::Right: StartSide = SideLeft; break;
+		case EPuzzleDir::Down:  StartSide = SideTop; break;
+		case EPuzzleDir::Left:  StartSide = SideRight; break;
 		}
+
+		const bool bOpposite = ExitSide == Opposite(StartSide);
+		const bool bNeighbouring = ExitSide != StartSide && !bOpposite;
 
 		if (bOpposite || bNeighbouring)
 		{
@@ -572,6 +594,38 @@ void AGridManager::FindRoutes(const TArray<bool>& FilledState, const TArray<EPuz
 		{
 			OutCircuitCells.Add(Index);
 		}
+	}
+
+	// Circuit cells that point at one another are one circuit (a loop with a tail feeding it counts once).
+	if (OutCircuitCount)
+	{
+		TMap<int32, int32> Parent;
+		for (int32 Index : OutCircuitCells)
+		{
+			Parent.Add(Index, Index);
+		}
+		auto Find = [&](int32 Index)
+		{
+			while (Parent[Index] != Index)
+			{
+				Index = Parent[Index];
+			}
+			return Index;
+		};
+		for (int32 Index : OutCircuitCells)
+		{
+			const int32 Target = Next(Index);
+			if (Target >= 0 && Parent.Contains(Target))
+			{
+				Parent[Find(Index)] = Find(Target);
+			}
+		}
+		TSet<int32> Roots;
+		for (int32 Index : OutCircuitCells)
+		{
+			Roots.Add(Find(Index));
+		}
+		*OutCircuitCount = Roots.Num();
 	}
 }
 
@@ -623,14 +677,16 @@ int32 AGridManager::CountFilled() const
 	return Count;
 }
 
-void AGridManager::PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, APuzzleFX* FX)
+void AGridManager::PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, APuzzleFX* FX, const TMap<int32, float>* FlowDelay)
 {
 	for (int32 Index : Indices)
 	{
 		APuzzleTile* Tile = CellVisuals[Index];
-		const float Ripple = FVector2D::Distance(FVector2D(Index % GridWidth, Index / GridWidth), Centre) * 0.05f;
+		const float* Flow = FlowDelay ? FlowDelay->Find(Index) : nullptr;
+		const float Ripple = Flow ? *Flow : FVector2D::Distance(FVector2D(Index % GridWidth, Index / GridWidth), Centre) * 0.05f;
 		const float PopDelay = Delay + 0.1f + Ripple;
 
+		const EPuzzleBonus BonusKind = static_cast<EPuzzleBonus>(CellBonus[Index]);
 		Filled[Index] = false;
 		CellBonus[Index] = 0;
 		CellVisuals[Index] = nullptr;
@@ -639,17 +695,37 @@ void AGridManager::PopCells(const TArray<int32>& Indices, const FVector2D& Centr
 		{
 			continue;
 		}
-		Tile->PlayClearEffectAndDestroy(PopDelay, 1.f);
+		// A bonus tile plays its own clear first (potion drains or fills, pumpkin swells), then bursts.
+		const bool bBonusTile = BonusKind != EPuzzleBonus::None;
+		const float BurstDelay = PopDelay + (bBonusTile ? 0.9f : 0.f);
+		if (bBonusTile)
+		{
+			Tile->PlayBonusClear(PopDelay, BonusKind == EPuzzleBonus::Basic ? 3.2f : 1.f);
+		}
+		else
+		{
+			Tile->PlayClearEffectAndDestroy(PopDelay, 1.f);
+		}
 
 		if (FX)
 		{
-			const FLinearColor Color = PuzzleTypes::ToLinearColor(CellColors[Index]) * 1.4f + FLinearColor(0.25f, 0.25f, 0.25f);
+			const FLinearColor Color = bBonusTile ? PuzzleTypes::BonusToColor(BonusKind) * 1.6f : PuzzleTypes::ToLinearColor(CellColors[Index]) * 1.4f + FLinearColor(0.25f, 0.25f, 0.25f);
 			const FVector Top = Tile->GetActorLocation() + FVector(0.f, 0.f, APuzzleTile::HalfHeight + 4.f);
 			for (int32 S = 0; S < 3; ++S)
 			{
-				FX->AddSparkle(Top + FVector(FMath::FRandRange(-25.f, 25.f), FMath::FRandRange(-25.f, 25.f), 0.f), Color, PopDelay + 0.1f);
+				FX->AddSparkle(Top + FVector(FMath::FRandRange(-25.f, 25.f), FMath::FRandRange(-25.f, 25.f), 0.f), Color, BurstDelay + 0.1f);
 			}
-			FX->AddSparkle(Top, FLinearColor(1.f, 0.95f, 0.8f), PopDelay + 0.12f);
+			FX->AddSparkle(Top, FLinearColor(1.f, 0.95f, 0.8f), BurstDelay + 0.12f);
+			if (BonusKind == EPuzzleBonus::Basic)
+			{
+				// The pumpkin bursts in a fireball of orange sparks.
+				for (int32 S = 0; S < 28; ++S)
+				{
+					FX->AddSparkle(Top + FVector(FMath::FRandRange(-40.f, 40.f), FMath::FRandRange(-40.f, 40.f), FMath::FRandRange(0.f, 30.f)), Color, BurstDelay + FMath::FRandRange(0.f, 0.12f));
+				}
+				FX->AddRing(Top, 230.f, FLinearColor(1.f, 0.4f, 0.05f) * 2.5f, BurstDelay);
+				FX->AddRing(Top, 140.f, FLinearColor(1.f, 0.85f, 0.3f) * 2.f, BurstDelay + 0.05f);
+			}
 		}
 	}
 }
@@ -716,7 +792,7 @@ void AGridManager::FindBonusEvents(TArray<FBonusEvent>& OutEvents) const
 		}
 		const int32 X = Index % GridWidth;
 		const int32 Y = Index / GridWidth;
-		if (X == 0 || X == GridWidth - 1 || Y == 0 || Y == GridHeight - 1)
+		if (IsRouteStarter(X, Y, CellDirs[Index]))
 		{
 			TArray<int32> Chain;
 			WalkForward(Index, Chain);
@@ -842,20 +918,36 @@ int32 AGridManager::CountBonusTiles(EPuzzleBonus Kind) const
 
 bool AGridManager::SpawnBonusTile(EPuzzleBonus Kind, FIntPoint& OutCell)
 {
-	TArray<int32> Empty;
-	for (int32 Index = 0; Index < Filled.Num(); ++Index)
+	// Try every empty cell with the tile in it. A cell is out if the board would be stuck afterwards (no game
+	// over by spawning); of the rest, one where the tile does not score straight away is picked at random, and
+	// a scoring one only when there is no other.
+	TArray<int32> Quiet;
+	TArray<int32> Scoring;
+	for (int32 Candidate = 0; Candidate < Filled.Num(); ++Candidate)
 	{
-		if (!Filled[Index])
+		if (Filled[Candidate])
 		{
-			Empty.Add(Index);
+			continue;
+		}
+		Filled[Candidate] = true;
+		CellBonus[Candidate] = static_cast<uint8>(Kind);
+		const bool bStuck = !CanAnyTrayPieceFit();
+		TArray<FBonusEvent> Events;
+		FindBonusEvents(Events);
+		Filled[Candidate] = false;
+		CellBonus[Candidate] = 0;
+		if (!bStuck)
+		{
+			(Events.Num() == 0 ? Quiet : Scoring).Add(Candidate);
 		}
 	}
-	if (Empty.Num() == 0)
+	const TArray<int32>& Choices = Quiet.Num() > 0 ? Quiet : Scoring;
+	if (Choices.Num() == 0)
 	{
 		return false;
 	}
 
-	const int32 Index = Empty[FMath::RandRange(0, Empty.Num() - 1)];
+	const int32 Index = Choices[FMath::RandRange(0, Choices.Num() - 1)];
 	const int32 X = Index % GridWidth;
 	const int32 Y = Index / GridWidth;
 	OutCell = FIntPoint(X, Y);
@@ -880,7 +972,8 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 	FClearResult Result;
 	TArray<FRouteInfo> Routes;
 	TArray<int32> Circuits;
-	FindRoutes(Filled, CellDirs, Routes, Circuits);
+	int32 CircuitCount = 0;
+	FindRoutes(Filled, CellDirs, Routes, Circuits, &CircuitCount);
 	TArray<FBonusEvent> Bonuses;
 	FindBonusEvents(Bonuses);
 
@@ -905,6 +998,7 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 	}
 	Result.Cells = RouteCells.Num();
 	Result.CircuitCells = Circuits.Num();
+	Result.Circuits = CircuitCount;
 
 	FVector2D CentroidCell = FVector2D::ZeroVector;
 	for (int32 Index : CellsToClear)
@@ -918,29 +1012,54 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 	SpawnParams.Owner = this;
 	APuzzleFX* FX = GetWorld() ? GetWorld()->SpawnActor<APuzzleFX>(APuzzleFX::StaticClass(), LastClearCentroid, FRotator::ZeroRotator, SpawnParams) : nullptr;
 
-	// A glow runs along each route tile to tile (gold for routes, the bonus tile's colour for bonus chains);
-	// closed circuits get a violet ring on every tile.
+	// A stream of glowing liquid runs along each route in its flow direction: lime green for routes, the bonus
+	// tile's own colour (pumpkin orange, potion magenta) for bonus chains. The tiles pop as the stream reaches them.
+	// Closed circuits get a violet ring on every tile.
 	const float StripZ = GetPickPlaneZ() + APuzzleTile::HalfHeight + 6.f;
+	constexpr float FlowSpeed = 1100.f;
+	TMap<int32, float> FlowDelay;
+	auto NoteFlow = [&](const TArray<int32>& Chain)
+	{
+		for (int32 Step = 0; Step < Chain.Num(); ++Step)
+		{
+			const float At = Step * TileSpacing / FlowSpeed;
+			float& Slot = FlowDelay.FindOrAdd(Chain[Step], At);
+			Slot = FMath::Min(Slot, At);
+		}
+	};
+	for (const FRouteInfo& Info : Routes)
+	{
+		NoteFlow(Info.Cells);
+	}
+	for (const FBonusEvent& Event : Bonuses)
+	{
+		NoteFlow(Event.Cells);
+	}
 	if (FX)
 	{
-		auto GlowAlong = [&](const TArray<int32>& Chain, const FLinearColor& Color)
+		auto StreamAlong = [&](const TArray<int32>& Chain, const FLinearColor& Color, bool bLeavesBoard)
 		{
-			for (int32 Step = 0; Step + 1 < Chain.Num(); ++Step)
+			TArray<FVector> Points;
+			for (int32 Cell : Chain)
 			{
-				const FVector From = GetWorldLocationForCell(Chain[Step] % GridWidth, Chain[Step] / GridWidth);
-				const FVector To = GetWorldLocationForCell(Chain[Step + 1] % GridWidth, Chain[Step + 1] / GridWidth);
-				const FVector Middle = (From + To) * 0.5f;
-				const bool bHorizontal = Chain[Step] / GridWidth == Chain[Step + 1] / GridWidth;
-				FX->AddStrip(FVector(Middle.X, Middle.Y, StripZ), FVector2D(TileSpacing * 1.15f, 70.f), bHorizontal ? 0.f : 90.f, Color, ClearDelay + Step * 0.03f);
+				const FVector At = GetWorldLocationForCell(Cell % GridWidth, Cell / GridWidth);
+				Points.Add(FVector(At.X, At.Y, StripZ));
 			}
+			if (bLeavesBoard && Chain.Num() > 0)
+			{
+				// On past the last tile, out over the edge of the board.
+				const FIntPoint Out = PuzzleTypes::DirToOffset(CellDirs[Chain.Last()]);
+				Points.Add(Points.Last() + FVector(Out.X * TileSpacing * 0.9f, -Out.Y * TileSpacing * 0.9f, 0.f));
+			}
+			FX->AddStream(Points, Color, ClearDelay, FlowSpeed);
 		};
 		for (const FRouteInfo& Info : Routes)
 		{
-			GlowAlong(Info.Cells, FLinearColor(1.0f, 0.75f, 0.3f));
+			StreamAlong(Info.Cells, FLinearColor(0.45f, 1.0f, 0.05f) * 1.7f, true);
 		}
 		for (const FBonusEvent& Event : Bonuses)
 		{
-			GlowAlong(Event.Cells, PuzzleTypes::BonusToColor(Event.Kind) * 1.6f);
+			StreamAlong(Event.Cells, PuzzleTypes::BonusToColor(Event.bLinked ? EPuzzleBonus::Outgoing : Event.Kind) * 1.6f, false);
 		}
 		for (int32 Index : Circuits)
 		{
@@ -953,7 +1072,7 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 		}
 	}
 
-	PopCells(CellsToClear.Array(), CentroidCell, ClearDelay, Result, FX);
+	PopCells(CellsToClear.Array(), CentroidCell, ClearDelay, Result, FX, &FlowDelay);
 	return Result;
 }
 
@@ -1131,12 +1250,11 @@ void AGridManager::ConsumeTraySlot(int32 SlotIndex)
 
 void AGridManager::RerollTray()
 {
+	// A full refresh: all three tray slots get new pieces, however many were still unplayed (the hold slot is kept).
 	for (int32 SlotIndex = 0; SlotIndex < TraySize; ++SlotIndex)
 	{
-		if (!TraySlotUsed[SlotIndex])
-		{
-			Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
-		}
+		Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
+		TraySlotUsed[SlotIndex] = false;
 	}
 	RefreshTrayVisuals();
 

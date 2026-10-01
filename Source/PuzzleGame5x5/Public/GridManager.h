@@ -38,6 +38,7 @@ struct FClearResult
 	TArray<FBonusEvent> Bonuses; // the bonus tiles cleared by chains
 	int32 Cells = 0;          // cells emptied by routes (these score)
 	int32 CircuitCells = 0;   // cells emptied by closed circuits (these do not score)
+	int32 Circuits = 0;       // how many separate closed circuits ("tricks") that was
 };
 
 // Owns the board state (4x4 up to 8x8), the tray (three pieces + one reserve "hold" slot)
@@ -178,7 +179,8 @@ private:
 
 	void BuildBoardVisuals();
 	APuzzleTile* SpawnTile(const FVector& BaseLocation, EPuzzleTileColor Color, EPuzzleDir Dir, float Scale);
-	void PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, class APuzzleFX* FX);
+	// FlowDelay (optional) gives cells of a route the delay at which the stream reaches them; the rest ripple out from Centre.
+	void PopCells(const TArray<int32>& Indices, const FVector2D& Centre, float Delay, FClearResult& Result, class APuzzleFX* FX, const TMap<int32, float>* FlowDelay = nullptr);
 
 	UPROPERTY()
 	TArray<TObjectPtr<APuzzleTile>> TrayVisuals;
@@ -208,11 +210,17 @@ private:
 
 	bool IsValidCoord(int32 X, int32 Y) const;
 
-	// Finds the routes and the cells of closed circuits. A route leaves the board through the side opposite
-	// its first tile's side, or through a neighbouring side. A chain of two or more tiles that leaves through
+	// Route roles, from where a tile sits and which way it points. A starter sits next to a side of the board and
+	// points straight away from it; an ender sits next to a side and points straight at it.
+	// Only a starter can begin a route, and a route ends on an ender.
+	bool IsRouteStarter(int32 X, int32 Y, EPuzzleDir Dir) const;
+	bool IsRouteEnder(int32 X, int32 Y, EPuzzleDir Dir) const;
+
+	// Finds the routes and the cells of closed circuits. A route begins on a starter, follows the tiles and ends on an ender; it leaves
+	// the board through the side opposite its starter's side, or through a neighbouring side. A chain of two or more tiles that leaves through
 	// the side it started on counts as a closed circuit.
 	// Finds the bonus tiles that a chain clears right now: basic, outgoing, incoming and linked pairs.
 	// A bonus tile points nowhere: chains end on it, and a chain can leave it through any neighbour.
 	void FindBonusEvents(TArray<FBonusEvent>& OutEvents) const;
-	void FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells) const;
+	void FindRoutes(const TArray<bool>& FilledState, const TArray<EPuzzleDir>& DirState, TArray<FRouteInfo>& OutRoutes, TArray<int32>& OutCircuitCells, int32* OutCircuitCount = nullptr) const;
 };

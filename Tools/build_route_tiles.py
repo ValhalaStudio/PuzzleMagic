@@ -1,7 +1,7 @@
-# Route-puzzle tiles: builds M_TileRoute (a copy of M_TileGothic; an asset that C++ loads can't be
-# rebuilt in place, so each new tile look gets a new name) so every tile carries a triangle that shows
-# the direction its route flows (Direction 0 = up, 1 = right, 2 = down, 3 = left; -1 = no triangle,
-# the five sigils show instead). The triangle is drawn as a gold inlay like the sigils were.
+# Halloween route tiles: builds/rebuilds M_TileRoute so every tile carries a skeleton hand whose pointing
+# finger shows the direction its route flows (Direction 0 = up, 1 = right, 2 = down, 3 = left; -1 = no hand).
+# The hand is bone white, or black on the ash-grey tiles (Symbol = tile colour index: 0 black, 1 purple, 2 red,
+# 3 ash). Only the hand is new: the enamel, clear coat and glow come from the original arcane tile material.
 # Run: UnrealEditor-Cmd.exe <uproject> -run=pythonscript -script=<this file>   (the editor must be closed)
 import unreal
 
@@ -18,19 +18,54 @@ _body = open(SCR + "/arcane_body.py", encoding="utf-8").read()
 exec(_body[:_body.index("# ======")])  # EXTRA
 
 EXTRA += r"""
-    // Triangle with vertices a, b, c (signed distance, negative inside).
-    float Tri(float2 p, float2 a, float2 b, float2 c)
+    float Cap(float2 p, float2 a, float2 b, float r)
     {
-        float2 e0 = b - a; float2 e1 = c - b; float2 e2 = a - c;
-        float2 v0 = p - a; float2 v1 = p - b; float2 v2 = p - c;
-        float2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
-        float2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
-        float2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
-        float s = sign(e0.x * e2.y - e0.y * e2.x);
-        float2 d = min(min(float2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
-                           float2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
-                           float2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
-        return -sqrt(d.x) * sign(d.y);
+        float2 pa = p - a;
+        float2 ba = b - a;
+        float h = saturate(dot(pa, ba) / dot(ba, ba));
+        return length(pa - ba * h) - r;
+    }
+    float Seg2(float2 p, float2 a, float2 b)
+    {
+        float2 pa = p - a;
+        float2 ba = b - a;
+        float h = saturate(dot(pa, ba) / dot(ba, ba));
+        return length(pa - ba * h);
+    }
+    float SMinH(float a, float b, float k)
+    {
+        float h = saturate(0.5 + 0.5 * (b - a) / k);
+        return lerp(b, a, h) - k * h * (1.0 - h);
+    }
+    // A skeleton hand in a fist with the index finger out, pointing up (+y). Detail = the joint and bone lines.
+    float Hand(float2 p, out float detail)
+    {
+        p.y += 0.12;
+        float2 f0 = float2(-0.12, 0.00);
+        float2 f1 = float2(-0.12, 0.27);
+        float2 f2 = float2(-0.12, 0.49);
+        float2 f3 = float2(-0.12, 0.69);
+        // wrist bones and the fist
+        float d = RoundBox(p - float2(0.04, -0.27), float2(0.31, 0.24), 0.12);
+        // the three curled fingers show as knuckles
+        d = min(d, length(p - float2(0.07, -0.02)) - 0.095);
+        d = min(d, length(p - float2(0.19, -0.04)) - 0.095);
+        d = min(d, length(p - float2(0.30, -0.10)) - 0.088);
+        // thumb
+        d = min(d, Cap(p, float2(-0.22, -0.22), float2(-0.42, -0.02), 0.075));
+        d = min(d, length(p - float2(-0.42, -0.02)) - 0.088);
+        // index finger: three phalanges and their joints
+        d = min(d, Cap(p, f0, f1, 0.062));
+        d = min(d, Cap(p, f1, f2, 0.055));
+        d = min(d, Cap(p, f2, f3, 0.046));
+        d = min(d, length(p - f1) - 0.08);
+        d = min(d, length(p - f2) - 0.072);
+        d = min(d, length(p - f3) - 0.06);
+        detail = min(Seg2(p, f1 + float2(-0.06, 0.0), f1 + float2(0.06, 0.0)), Seg2(p, f2 + float2(-0.055, 0.0), f2 + float2(0.055, 0.0)));
+        detail = min(detail, Seg2(p, float2(0.07, -0.10), float2(0.06, -0.44)));
+        detail = min(detail, Seg2(p, float2(0.18, -0.11), float2(0.18, -0.44)));
+        detail = min(detail, Seg2(p, float2(0.28, -0.16), float2(0.28, -0.40)));
+        return d;
     }
 """
 
@@ -51,26 +86,31 @@ tile_code = tile_code.replace('"M_TileArcane"', '"M_TileRoute"')
 tile_code = swap(tile_code, """        if (InSymbol > -0.5)
         {
             float detail;
-            float d = F.Symbol(p, InSymbol, detail);""", """        if (InDir > -0.5 || InSymbol > -0.5)
+            float d = F.Symbol(p, InSymbol, detail);""", """        if (InDir > -0.5)
         {
-            float detail = 1000.0;
-            float d;
-            if (InDir > -0.5)
-            {
-                // Rotate the sample point so the triangle (apex up) points the way the route flows.
-                float2 dv = float2(InDir > 0.5 && InDir < 1.5 ? 1.0 : (InDir > 2.5 ? -1.0 : 0.0),
-                                   InDir < 0.5 ? 1.0 : (InDir > 1.5 && InDir < 2.5 ? -1.0 : 0.0));
-                float2 pl = float2(dot(p, float2(dv.y, -dv.x)), dot(p, dv));
-                d = F.Tri(pl * 0.95, float2(0.0, 0.62), float2(-0.52, -0.42), float2(0.52, -0.42)) / 0.95;
-            }
-            else
-            {
-                d = F.Symbol(p, InSymbol, detail);
-            }""")
+            // Rotate the sample point so the hand points the way the route flows.
+            float2 dv = float2(InDir > 0.5 && InDir < 1.5 ? 1.0 : (InDir > 2.5 ? -1.0 : 0.0),
+                               InDir < 0.5 ? 1.0 : (InDir > 1.5 && InDir < 2.5 ? -1.0 : 0.0));
+            float2 pl = float2(dot(p, float2(dv.y, -dv.x)), dot(p, dv));
+            float handDetail;
+            float hd = F.Hand(pl * 0.72, handDetail) / 0.72;
+            float haa = max(fwidth(hd), 0.0001);
+            float hfill = 1.0 - smoothstep(-haa, haa, hd);
+            float hedge = (1.0 - smoothstep(0.018 - haa, 0.018 + haa, abs(hd))) * hfill;
+            float hline = (1.0 - smoothstep(0.012 - haa, 0.012 + haa, handDetail / 0.72)) * hfill;
+            float dark = InSymbol > 2.5 ? 1.0 : 0.0;
+            float3 bone = lerp(float3(0.93, 0.89, 0.76), float3(0.02, 0.02, 0.025), dark);
+            base = lerp(base, bone, hfill);
+            base = lerp(base, lerp(bone * 0.35, float3(0.6, 0.6, 0.65), dark), max(hedge, hline * 0.8));
+            metal = 0.0;
+            rough = lerp(rough, 0.5, hfill);
+            emis += bone * 0.12 * hfill;
+        }
+        else if (InSymbol > -0.5)
+        {
+            float detail;
+            float d = F.Symbol(p, InSymbol, detail);""")
 tile_code = swap(tile_code, '"InSymbol", "InGlow", "InStone", "InShimmer", "InTime"]', '"InSymbol", "InGlow", "InStone", "InShimmer", "InTime", "InDir"]')
 tile_code = swap(tile_code, '      (scalar_param(tile, "Shimmer", 0.0, y=360), "InShimmer"),', '      (scalar_param(tile, "Shimmer", 0.0, y=360), "InShimmer"),\n      (scalar_param(tile, "Direction", -1.0, y=520), "InDir"),')
-# Light tiles (green, blue/teal, yellow) get a red arrow so it reads against them; the dark ones keep gold.
-tile_code = swap(tile_code, "            float3 gold = float3(1.0, 0.82, 0.45);\n", "            float isRed = (InDir > -0.5 && InSymbol > 0.5 && InSymbol < 3.5) ? 1.0 : 0.0;\n            float3 gold = lerp(float3(1.0, 0.82, 0.45), float3(0.95, 0.03, 0.03), isRed);\n")
-tile_code = swap(tile_code, "            metal = fill * 0.75;", "            metal = fill * lerp(0.75, 0.1, isRed);")
 exec(tile_code)
 unreal.log("build_route_tiles.py: done")

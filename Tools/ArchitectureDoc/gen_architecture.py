@@ -480,6 +480,7 @@ CLASSES = [
     ("MeshBuffers", "board", "Turns ToonMesh buffers into realtime meshes: meshoptimizer ordering, one section per material slot, and a process-wide cache so every tile shares one mesh.", False),
     ("ToonMesh", "board", "Procedural geometry: rounded, bevelled blocks and their outline hulls as raw vertex buffers.", False),
 
+    ("AHalloweenProps", "atmos", "Halloween scenery beside the board: two iron cauldrons of bubbling lime-green liquid with steam and a flickering green glow, and bats that circle above them or cross the top of the scene.", False),
     ("AGothicEnvironment", "atmos", "The cathedral around the board and its moods: wall, stained glass, Blender-made piers, candles, flagstones, ambient storms, and the Lovecraftian layer. Dread (low luck) drives breathing and stuttering light, tentacles, eyes, fog, motes, the madness post-process, the MetaSound ambience and the convolution reverb.", False),
     ("EldritchNoise", "atmos", "Fractal noise for organic shapes and light: FastNoise2 SIMD on Windows, FMath::PerlinNoise elsewhere.", False),
 ]
@@ -511,6 +512,7 @@ RELATIONS = [
     ("APuzzleGameMode", "AGridManager", "own", "spawns the board", [(GM, r"SpawnActor<AGridManager>")]),
     ("APuzzleGameMode", "APuzzleInputHandler", "own", "spawns", [(GM, r"SpawnActor<APuzzleInputHandler>")]),
     ("APuzzleGameMode", "AGothicEnvironment", "own", "spawns", [(GM, r"SpawnActor<AGothicEnvironment>")]),
+    ("APuzzleGameMode", "AHalloweenProps", "own", "spawns", [(GM, r"SpawnActor<AHalloweenProps>")]),
     ("APuzzleGameMode", "UPuzzleBotPlayer", "own", "creates · TakeBestAction", [(GM, r"NewObject<UPuzzleBotPlayer>"), (GM, r"BotPlayer->TakeBestAction")]),
     ("APuzzleGameMode", "UPuzzleSaveGame", "call", "LoadOrCreate · Save", [(GM, r"UPuzzleSaveGame::LoadOrCreate"), (GM, r"SaveGame->Save\(\)")]),
     ("APuzzleGameMode", "UPuzzleHUDWidget", "call", "ShowCard · ShowClear", [(GM, r"UI->ShowCard"), (GM, r"UI->ShowClear")]),
@@ -564,8 +566,9 @@ SCRIPTS = [
     ("arcane_head.py", "Unreal editor Python", "Shared helpers for the material scripts: create or rebuild a material, custom HLSL nodes, parameters, and the NOISE and SYMBOLS HLSL libraries."),
     ("arcane_body.py", "Unreal editor Python", "M_TileArcane, M_HolyAura, M_PPInkOutline, M_UIPanel, M_UIIcon."),
     ("build_gothic_symbols.py", "Unreal editor Python", "M_TileGothic (the five sigils), M_UIIcon, M_GroundMist."),
-    ("build_route_tiles.py", "Unreal editor Python", "M_TileRoute: the tile material with a triangle inlay for the route direction."),
-    ("build_bonus_tiles.py", "Unreal editor Python", "M_TileBonus: the tile material for bonus tiles, which have no arrow but a diamond or fisheye emblem."),
+    ("build_route_tiles.py", "Unreal editor Python", "M_TileRoute: the tile material with a skeleton hand whose finger points along the route."),
+    ("build_halloween_fx.py", "Unreal editor Python", "M_CauldronLiquid, M_SteamPuff and M_BatSilhouette: the lime liquid, steam puffs and bat silhouettes of the Halloween scenery."),
+    ("build_bonus_tiles.py", "Unreal editor Python", "M_TileBonus: the tile material for bonus tiles: a full magenta potion bottle (outgoing), an empty one (incoming) or a carved pumpkin (non-directional)."),
     ("build_mist2.py", "Unreal editor Python", "M_GroundMist2."),
     ("build_storm_fx.py", "Unreal editor Python", "M_FXBolt, the lightning bolt."),
     ("build_eldritch_fx.py", "Unreal editor Python", "M_Tentacle, M_EldritchEye, M_PPMadness."),

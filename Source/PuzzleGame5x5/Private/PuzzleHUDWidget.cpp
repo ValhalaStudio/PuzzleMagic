@@ -273,7 +273,7 @@ void UPuzzleHUDWidget::BuildHUD()
 	TopBarSlot->SetPosition(FVector2D(-22.f, 36.f));
 	TopBarSlot->SetSize(FVector2D(560.f, 174.f));
 
-	// ---- Combo meter: "COMBO x5" and three pips = placements left to keep it alive ----
+	// ---- Combo meter: "TREAT! x5!" and three pips = placements left to keep it alive ----
 	UOverlay* Combo = WidgetTree->ConstructWidget<UOverlay>();
 	Combo->SetVisibility(ESlateVisibility::HitTestInvisible);
 	ComboBg = MakePanel(FLinearColor(0.4f, 0.03f, 0.3f), FLinearColor(0.1f, 0.005f, 0.09f), Rim, 330.f / 92.f, 0.45f, 0.3f);
@@ -283,7 +283,7 @@ void UPuzzleHUDWidget::BuildHUD()
 		BgSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 	UHorizontalBox* ComboRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	ComboText = MakeText(TEXT("COMBO x1"), false, 34.f, FLinearColor(1.f, 0.75f, 0.95f), 3.f);
+	ComboText = MakeText(TEXT("TREAT! x1!"), false, 34.f, FLinearColor(1.f, 0.75f, 0.95f), 3.f);
 	ComboRow->AddChildToHorizontalBox(ComboText)->SetVerticalAlignment(VAlign_Center);
 	for (int32 Pip = 0; Pip < UPuzzleManager::ComboWindowMoves; ++Pip)
 	{
@@ -720,8 +720,8 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	TArray<FPage> Pages;
 	Pages.Add({ TEXT("The Rite"),
 	  { { IconLine, Cyan, TEXT("ROUTE") } },
-	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each triangle pointing at the next, from one side of the board across to another and out.\n\n")
-	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed circuit and scores nothing.\n\n")
+	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each hand pointing at the next. It must START on a tile at the edge pointing straight away from that side, and END on a tile at an edge pointing straight out of it.\n\n")
+	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed circuit, a TRICK: it scores nothing and costs one step of your combo.\n\n")
 	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.") });
 	if (UPuzzleManager::bMoveBudgetEnabled)
 	{
@@ -734,21 +734,21 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	{
 		Pages.Add({ TEXT("Bonus Tiles"),
 		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
-		  TEXT("Glowing tiles without an arrow appear as your score grows: a plain BASIC one every 1000 points, an OUT (diamond) and an IN (eye) pair every 10000. There are never more than 2 BASIC tiles, or 1 OUT or 1 IN, on the board.\n\n")
-		  TEXT("BASIC clears when a chain of arrows joins it to a side. OUT sends a chain out through any neighbour and clears when the chain leaves the board. IN takes a chain arriving from any side, starting at a side. A chain from OUT to IN is worth 1000.") });
+		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 1000 points, and a full potion (OUT) with an empty potion (IN) every 10000. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
+		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A chain from the full potion to the empty one is worth 1000.") });
 	}
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{
 		Pages.Add({ TEXT("Combos"),
-		  { { IconStar, PaleGold, TEXT("COMBO") } },
-		  TEXT("Clear lines on following moves to build a COMBO. Several lines at once climb it faster.\n\n")
+		  { { IconStar, PaleGold, TEXT("TREAT") } },
+		  TEXT("Clear routes on following moves to build a TREAT combo: your route points are multiplied by it. Several routes at once climb it faster.\n\n")
 		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.") });
 	}
 	if (TutorialRules && TutorialRules->bRelicsEnabled)
 	{
 		Pages.Add({ TEXT("Relics"),
 		  { { IconSun, Gold, TEXT("HOLY LIGHT") }, { IconReroll, Cyan, TEXT("REROLL") } },
-		  TEXT("HOLY LIGHT: tap the board to purge a 3x3 area.\nREROLL: summon a fresh tray of pieces.") });
+		  TEXT("HOLY LIGHT: tap the board to purge a 3x3 area. It scores nothing.\nREROLL: replace the whole tray with fresh pieces. It scores nothing.") });
 	}
 	if (TutorialRules && TutorialRules->bLuckEnabled)
 	{
@@ -864,7 +864,7 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 	{
 		if (Result.CircuitCells > 0)
 		{
-			AddPopup(MakeText(TEXT("Circuit!"), false, 96.f, FLinearColor(0.85f, 0.5f, 1.f), 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
+			AddPopup(MakeText(TEXT("Trick!"), false, 96.f, FLinearColor(0.85f, 0.5f, 1.f), 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
 		}
 	}
 	else
@@ -873,6 +873,10 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 		static const FLinearColor Colors[] = { FLinearColor(0.3f, 0.9f, 1.f), FLinearColor(0.35f, 1.f, 0.25f), FLinearColor(1.f, 0.4f, 1.f), Gold, FLinearColor(1.f, 0.3f, 0.2f) };
 		const int32 Tier = FMath::Clamp(Result.Lines - 1, 0, 4);
 		AddPopup(MakeText(Words[Tier], false, 96.f + 12.f * Tier, Colors[Tier], 7.f), FVector2D(0.5f, 0.2f), 1.4f, 1.f);
+		if (Result.Circuits > 0)
+		{
+			AddPopup(MakeText(TEXT("Trick!"), false, 60.f, FLinearColor(0.85f, 0.5f, 1.f), 5.f), FVector2D(0.5f, 0.38f), 1.4f, 1.f, 0.3f);
+		}
 	}
 
 
@@ -885,7 +889,10 @@ void UPuzzleHUDWidget::ShowClear(const FPuzzleClearEvent& Event)
 		BonusRow += 0.06f;
 	}
 
-	AddWorldPopup(MakeText(FString::Printf(TEXT("+%d"), Event.Points), false, 70.f, FLinearColor::White, 5.f), Event.Centroid, 1.2f);
+	if (!Event.bHolyLight)
+	{
+		AddWorldPopup(MakeText(FString::Printf(TEXT("+%d"), Event.Points), false, 70.f, FLinearColor::White, 5.f), Event.Centroid, 1.2f);
+	}
 
 	if (Event.BonusMoves > 0)
 	{
@@ -899,7 +906,7 @@ void UPuzzleHUDWidget::ShowComboBroken(int32 LostCombo)
 {
 	if (LostCombo >= 2)
 	{
-		AddPopup(MakeText(FString::Printf(TEXT("combo x%d lost"), LostCombo), false, 40.f, FLinearColor(0.55f, 0.5f, 0.65f), 3.f),
+		AddPopup(MakeText(FString::Printf(TEXT("treat x%d lost"), LostCombo), false, 40.f, FLinearColor(0.55f, 0.5f, 0.65f), 3.f),
 			ComboAnchorFraction + FVector2D(0.f, 70.f / FMath::Max(CanvasSize.Y, 1.f)), 1.2f, 1.f, 0.f, -50.f);
 	}
 }
@@ -1065,7 +1072,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	ComboBadge->SetVisibility(bShowCombo ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (bShowCombo)
 	{
-		ComboText->SetText(FText::FromString(FString::Printf(TEXT("COMBO x%d"), Combo)));
+		ComboText->SetText(FText::FromString(FString::Printf(TEXT("TREAT! x%d!"), Combo)));
 		const bool bDanger = Rules->ComboWindow <= 1;
 		const float Wobble = bDanger ? FMath::Sin(Time * 30.f) * 3.f : 0.f;
 		FWidgetTransform Transform;

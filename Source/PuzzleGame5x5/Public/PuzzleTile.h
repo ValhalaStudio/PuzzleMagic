@@ -43,6 +43,10 @@ public:
 	// with the golden sheen sweeping over it.
 	void SetBonus(EPuzzleBonus NewBonus);
 
+	// A bonus tile's own clear: after Delay a potion drains (outgoing) or fills (incoming), or the pumpkin swells and
+	// shakes, then it pops like any tile (the pumpkin with a much bigger burst).
+	void PlayBonusClear(float Delay, float InLaunchStrength);
+
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void MoveToPosition(int32 NewGridX, int32 NewGridY);
 
@@ -79,7 +83,7 @@ protected:
 	TObjectPtr<UMaterialInstanceDynamic> DynamicMaterial;
 
 private:
-	enum class EAnim : uint8 { None, Arriving, Squash, ClearPending, Popping, Flying };
+	enum class EAnim : uint8 { None, Arriving, Squash, BonusPre, ClearPending, Popping, Flying };
 
 	void ApplyVisualState();
 	void Launch();
@@ -101,6 +105,9 @@ private:
 	EPuzzleDir TileDirection = EPuzzleDir::Up;
 	bool bHasDirection = false;
 	EPuzzleBonus Bonus = EPuzzleBonus::None;
+	// Liquid level of a potion bottle emblem (1 full, 0 empty).
+	float BonusFill = 0.f;
+	FVector BonusRestLocation = FVector::ZeroVector;
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> BonusMaterial;
