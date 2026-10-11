@@ -146,6 +146,28 @@ void APuzzleGameMode::SetFullscreen(bool bFullscreen)
 #endif
 }
 
+bool APuzzleGameMode::IsPortrait() const
+{
+	return SaveGame && SaveGame->bPortrait;
+}
+
+void APuzzleGameMode::ApplyOrientation() const
+{
+	// Only does something on a phone or tablet. The sensor variants let the screen flip between the two ways up.
+	FPlatformMisc::SetAllowedDeviceOrientation(IsPortrait() ? EDeviceScreenOrientation::PortraitSensor : EDeviceScreenOrientation::LandscapeSensor);
+}
+
+void APuzzleGameMode::SetPortrait(bool bPortrait)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+	SaveGame->bPortrait = bPortrait;
+	SaveGame->Save();
+	ApplyOrientation();
+}
+
 void APuzzleGameMode::StartPlay()
 {
 	Super::StartPlay();
@@ -155,6 +177,9 @@ void APuzzleGameMode::StartPlay()
 	{
 		MusicVolume = SaveGame->MusicVolume;
 		SfxVolume = SaveGame->SfxVolume;
+#if PLATFORM_ANDROID || PLATFORM_IOS
+		ApplyOrientation();
+#endif
 		if (SaveGame->DisplayMode >= 0 && !PuzzleLite::IsMobile() && IsFullscreen() != (SaveGame->DisplayMode == 1))
 		{
 			SetFullscreen(SaveGame->DisplayMode == 1);

@@ -654,7 +654,9 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 			UWidget* GraphicsButton = Btn(FString::Printf(TEXT("GRAPHICS %s"), bLow ? TEXT("LOW") : TEXT("HIGH")), FVector2D(316.f, 80.f), bLow ? Ruby : Emerald, bLow ? Ruby2 : Emerald2, ActToggleGraphics);
 			UWidget* ScreenButton = Btn(bFull ? TEXT("FULLSCREEN") : TEXT("WINDOWED"), FVector2D(316.f, 80.f), bFull ? Emerald : Amethyst, bFull ? Emerald2 : Amethyst2, ActToggleScreen);
 #if PLATFORM_IOS || PLATFORM_ANDROID
-			Add(MakeText(TEXT("graphics are always low on this device"), false, 26.f, Lavender, 3.f), 24.f);
+			const bool bPortraitNow = GameMode && GameMode->IsPortrait();
+			Add(Btn(bPortraitNow ? TEXT("PORTRAIT") : TEXT("LANDSCAPE"), FVector2D(400.f, 84.f), Amethyst, Amethyst2, ActToggleOrientation), 28.f);
+			Add(MakeText(TEXT("graphics are always low on this device"), false, 24.f, Lavender, 3.f), 4.f);
 			(void)GraphicsButton; (void)ScreenButton;
 #else
 			Add(ButtonRow(GraphicsButton, ScreenButton), 28.f);
@@ -912,6 +914,10 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 	case ActOptions: ShowCard(EPuzzleCard::Options); break;
 	case ActToggleGraphics:
 		GameMode->SetLowGraphics(!GameMode->IsLowGraphics()); // reloads the map
+		break;
+	case ActToggleOrientation:
+		GameMode->SetPortrait(!GameMode->IsPortrait());
+		RefreshCard();
 		break;
 	case ActToggleScreen:
 		GameMode->SetFullscreen(!GameMode->IsFullscreen());

@@ -181,6 +181,11 @@ public:
 	bool IsFullscreen() const;
 	int32 LastWindowMode = -1; // 1 fullscreen, 0 windowed; Tick watches it, since Alt+Enter and F11 change it too
 	void SetFullscreen(bool bFullscreen);
+
+	// Phones and tablets: the Landscape / Portrait choice of the options card (locks the screen that way).
+	bool IsPortrait() const;
+	void SetPortrait(bool bPortrait);
+	void ApplyOrientation() const;
 	void SetSfxVolume(float Volume);
 
 	// Console commands for measuring performance on a device (they work in any build with a console).

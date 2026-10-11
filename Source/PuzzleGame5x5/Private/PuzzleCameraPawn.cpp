@@ -132,7 +132,11 @@ void APuzzleCameraPawn::UpdateFraming()
 	// The vertical fit gets extra room: the tray at the near edge looms larger than the tilt alone predicts,
 	// which cut it off at the bottom in short landscape windows.
 	constexpr float PerspectiveAllowance = 1.16f;
-	const float Distance = FMath::Max(HalfSize.X / TanHalfH, HalfSize.Y * Tilt * PerspectiveAllowance / TanHalfV) * FramingMargin;
+	// On a narrow screen (a phone held upright) the width is what limits the fit, and the near tray row looks wider than the far
+	// edge of the board, so it needs the same kind of allowance sideways. Wide screens keep the exact fit.
+	const float NarrowAmount = FMath::Clamp((1.35f - Aspect) / 0.5f, 0.f, 1.f);
+	const float WidthAllowance = FMath::Lerp(1.f, 1.2f, NarrowAmount);
+	const float Distance = FMath::Max(HalfSize.X * WidthAllowance / TanHalfH, HalfSize.Y * Tilt * PerspectiveAllowance / TanHalfV) * FramingMargin;
 
 	const FRotator ViewRotation(ViewPitch, ViewYaw, 0.f);
 	const FVector Focus(Center.X, Center.Y, FramingGroundZ);

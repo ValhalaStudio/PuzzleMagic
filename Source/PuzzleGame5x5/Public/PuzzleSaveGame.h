@@ -43,6 +43,10 @@ public:
 	UPROPERTY()
 	int32 DisplayMode = -1;
 
+	// Phones and tablets: hold the screen upright (portrait) instead of sideways (landscape, the default).
+	UPROPERTY()
+	bool bPortrait = false;
+
 	// Arcade and tutorial: how many steps of the campaign are beaten in a row.
 	UPROPERTY()
 	int32 ArcadeProgress = 0;
