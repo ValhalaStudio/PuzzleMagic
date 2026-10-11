@@ -90,6 +90,10 @@ void AHalloweenProps::SetupLitePerformance()
 	// Screen-wide effects that are too dear for a weak mobile GPU.
 	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
 	{
+		if (PuzzleLite::IsMobile())
+		{
+			PC->ConsoleCommand(TEXT("t.MaxFPS 30"));
+		}
 		for (const TCHAR* Name : { TEXT("r.Mobile.AntiAliasing"), TEXT("r.BloomQuality"), TEXT("r.LensFlareQuality"), TEXT("r.SceneColorFringeQuality"), TEXT("r.FilmGrain") })
 		{
 			SetSaved(PC, Name, TEXT("0"));
@@ -126,11 +130,44 @@ void AHalloweenProps::RestoreAfterLite()
 	GSavedSettings.Reset();
 }
 
+float AHalloweenProps::ComputeLiteDepthScale() const
+{
+	const APuzzleCameraPawn* Pawn = Cast<APuzzleCameraPawn>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (!Pawn)
+	{
+		return 1.f;
+	}
+	// The board and tray reach a little past the framed point towards the camera's far side: keep a margin behind them.
+	return FMath::Max(1.f, Pawn->GetFramingDistance() * 1.3f / BatDepth);
+}
+
+void AHalloweenProps::SetPerfOverride(bool bAdapt, float Resolution)
+{
+	bAdaptResolution = bAdapt;
+	if (Resolution > 0.f)
+	{
+		LiteResolution = FMath::Clamp(Resolution, 0.35f, 1.f);
+		ApplyLiteResolution();
+	}
+	// A fresh measuring window when the automatic resolution is switched back on.
+	LiteWindowTime = 0.f;
+	LiteWindowWorst = 0.f;
+	LiteWindowFrames = 0;
+}
+
 void AHalloweenProps::AdaptResolution(float DeltaTime)
 {
-	// A phone aims a little above 30 so ordinary dips stay above it; a PC in Low graphics aims for 60.
-	const float TargetFps = PuzzleLite::IsMobile() ? 33.f : 62.f;
-	const float SlowFps = PuzzleLite::IsMobile() ? 30.f : 50.f; // a PC held at 60 by vsync must not read as slow
+	if (!bAdaptResolution)
+	{
+		return;
+	}
+	// A phone or tablet is capped at 30 frames a second (about a fifth less power than running free, measured), so 30 is its
+	// best case: it counts as slow below 27.5 and the resolution only goes back up while it holds the cap. A PC in Low
+	// graphics aims for 60 (held there by vsync, so it must not read as slow above 50).
+	const bool bMobile = PuzzleLite::IsMobile();
+	const float TargetFps = bMobile ? 30.f : 62.f;
+	const float SlowFps = bMobile ? 27.5f : 50.f;
+	const float RaiseFps = bMobile ? 29.4f : TargetFps * 1.45f;
 	constexpr float WindowSeconds = 2.5f;
 	constexpr float MinResolution = 0.35f;
 
@@ -169,7 +206,7 @@ void AHalloweenProps::AdaptResolution(float DeltaTime)
 		LiteResolution = FMath::Clamp(LiteResolution * FMath::Sqrt(FMath::Max(Fps / TargetFps, 0.5f)), MinResolution, LiteCeiling);
 		ApplyLiteResolution();
 	}
-	else if (Fps > TargetFps * 1.45f && LiteResolution < FMath::Min(1.f, LiteCeiling))
+	else if (Fps > RaiseFps && LiteResolution < FMath::Min(1.f, LiteCeiling))
 	{
 		LiteLastRaiseFrom = LiteResolution;
 		LiteResolution = FMath::Min(LiteResolution + 0.05f, FMath::Min(1.f, LiteCeiling));
@@ -191,15 +228,17 @@ void AHalloweenProps::RefreshLiteFrame()
 	const APuzzleCameraPawn* Pawn = Cast<APuzzleCameraPawn>(UGameplayStatics::GetPlayerPawn(this, 0));
 	const float Fov = Pawn ? Pawn->LandscapeFOV : 50.f;
 	const float Aspect = Viewport.X / Viewport.Y;
-	if (FMath::IsNearlyEqual(Aspect, LiteAspect, 0.001f) && FMath::IsNearlyEqual(Fov, LiteFOV, 0.01f))
+	const float DepthScale = ComputeLiteDepthScale();
+	if (FMath::IsNearlyEqual(Aspect, LiteAspect, 0.001f) && FMath::IsNearlyEqual(Fov, LiteFOV, 0.01f) && FMath::IsNearlyEqual(DepthScale, LiteDepthScale, 0.01f))
 	{
 		return;
 	}
 	LiteAspect = Aspect;
 	LiteFOV = Fov;
+	LiteDepthScale = DepthScale;
 	if (LiteBackdrop)
 	{
-		PlaceOnBackdrop(LiteBackdrop, FVector2D::ZeroVector, BackdropDepth, 1.f, LiteImageAspect, false);
+		PlaceOnBackdrop(LiteBackdrop, FVector2D::ZeroVector, BackdropDepth * LiteDepthScale, 1.f, LiteImageAspect, false);
 	}
 }
 
@@ -233,7 +272,7 @@ void AHalloweenProps::BuildLite()
 		UMaterialInstanceDynamic* Back = UMaterialInstanceDynamic::Create(BackdropMaterial, this);
 		Back->SetTextureParameterValue(TEXT("Tex"), BackdropTexture);
 		LiteBackdrop = AddLiteQuad(Back);
-		PlaceOnBackdrop(LiteBackdrop, FVector2D::ZeroVector, BackdropDepth, 1.f, LiteImageAspect, false);
+		PlaceOnBackdrop(LiteBackdrop, FVector2D::ZeroVector, BackdropDepth * LiteDepthScale, 1.f, LiteImageAspect, false);
 	}
 
 	// Steam: five puffs over each cauldron, each rising and thinning out in turn.
@@ -308,7 +347,7 @@ void AHalloweenProps::TickLite(float DeltaTime)
 		}
 		const float U = Puff.Age / Puff.Life;
 		const FVector2D At = Puff.Anchor + FVector2D(Puff.Drift * U + 0.015f * FMath::Sin(Time * 0.9f + Puff.Anchor.X * 5.f + Puff.Life), 0.04f + 0.4f * U);
-		PlaceOnBackdrop(Puff.Mesh, At, SteamDepth, Puff.Size * (0.5f + 0.9f * U), 1.f, false);
+		PlaceOnBackdrop(Puff.Mesh, At, SteamDepth * LiteDepthScale, Puff.Size * (0.5f + 0.9f * U), 1.f, false);
 		Puff.MID->SetScalarParameterValue(TEXT("Frame"), FMath::FloorToFloat(Puff.Age * 6.f + Puff.Life * 3.f));
 		Puff.MID->SetScalarParameterValue(TEXT("Opacity"), 0.45f * FMath::Sin(U * PI));
 	}
@@ -332,7 +371,7 @@ void AHalloweenProps::TickLite(float DeltaTime)
 		{
 			Bat.bFacingRight = Heading > 0.f;
 		}
-		PlaceOnBackdrop(Bat.Mesh, At, BatDepth, Bat.Size, 1.f, false);
+		PlaceOnBackdrop(Bat.Mesh, At, BatDepth * LiteDepthScale, Bat.Size, 1.f, false);
 		Bat.MID->SetScalarParameterValue(TEXT("Frame"), FMath::FloorToFloat(Time * Bat.FlapRate + Bat.Phase * 3.f));
 	}
 }

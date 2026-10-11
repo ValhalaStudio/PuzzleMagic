@@ -23,6 +23,9 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Fonts/CompositeFont.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/Paths.h"
@@ -32,6 +35,8 @@
 
 namespace UIStyle
 {
+	// Width the long body text on the cards wraps to: the frame lines are 830 units apart and wrapped text draws about 15% wider than its box.
+	constexpr float BodyWrapWidth = 640.f;
 	// Linear colours (Slate converts to sRGB on output).
 	const FLinearColor Ink(0.02f, 0.008f, 0.04f);
 	const FLinearColor Gold(1.f, 0.55f, 0.08f);
@@ -94,8 +99,19 @@ FSlateFontInfo UPuzzleHUDWidget::Font(bool bTitle, float Size, float Outline) co
 	return FSlateFontInfo(bTitle ? TitleFont : BodyFont, Size, NAME_None, OutlineSettings);
 }
 
-UTextBlock* UPuzzleHUDWidget::MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline)
+UTextBlock* UPuzzleHUDWidget::MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline, bool bFitWidth)
 {
+	// Titles shrink to fit between the card's frame lines. The wide decorative face is drawn a little wider than it is
+	// measured (about 25% wider on a phone), so the limit leaves room (a card's frame lines are 830 units apart).
+	if ((bTitle || bFitWidth) && FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer())
+	{
+		constexpr float MaxTitleWidth = 560.f;
+		const float Width = static_cast<float>(FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text, Font(true, Size, Outline)).X);
+		if (Width > MaxTitleWidth)
+		{
+			Size *= MaxTitleWidth / Width;
+		}
+	}
 	UTextBlock* Block = WidgetTree->ConstructWidget<UTextBlock>();
 	Block->SetText(FText::FromString(Text));
 	Block->SetFont(Font(bTitle, Size, Outline));
@@ -710,7 +726,7 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Add(MakeText(bTutorial ? TEXT("Tutorial") : TEXT("Arcade"), true, 84.f, Gold, 6.f));
 		if (Camp && !Camp->CampaignName.IsEmpty() && Camp->CampaignName != TEXT("Arcade") && Camp->CampaignName != TEXT("Tutorial"))
 		{
-			Add(MakeText(Camp->CampaignName, false, 32.f, Lavender, 3.f), 4.f);
+			Add(MakeText(Camp->CampaignName, false, 32.f, Lavender, 3.f, true), 4.f);
 		}
 		Add(MakeText(FString::Printf(TEXT("%d of %d %s beaten"), Progress, Count, bTutorial ? TEXT("steps") : TEXT("challenges")), false, 30.f, Cyan, 3.f), 12.f);
 		if (Progress < Count)
@@ -739,7 +755,8 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		{
 			UTextBlock* Block = MakeText(Text, false, Size, Color, 3.f);
 			Block->SetAutoWrapText(true);
-			Add(Block, Top, HAlign_Fill);
+			// Wrapped text is drawn a little wider than the box it wraps to, so the box is narrower than the space inside the frame.
+			Add(Sized(Block, FVector2D(BodyWrapWidth, 0.f)), Top, HAlign_Center);
 		};
 		if (Card == EPuzzleCard::ArcadeDone)
 		{
@@ -806,7 +823,7 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		{
 			const bool bLast = Index + 1 >= Count;
 			Add(MakeText(TEXT("COMPLETE!"), true, 72.f, Gold, 6.f));
-			Add(MakeText(Title, false, 38.f, PaleGold, 4.f), 4.f);
+			Add(MakeText(Title, false, 38.f, PaleGold, 4.f, true), 4.f);
 			Body(FString::Printf(TEXT("score  %d"), GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->Score : 0), 30.f, Cyan, 10.f);
 			if (Challenge && !Challenge->OutroText.IsEmpty())
 			{
@@ -817,9 +834,17 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		else
 		{
 			Add(MakeText(TEXT("FAILED"), true, 72.f, FLinearColor(1.f, 0.25f, 0.3f), 6.f));
-			Add(MakeText(Title, false, 38.f, PaleGold, 4.f), 4.f);
+			Add(MakeText(Title, false, 38.f, PaleGold, 4.f, true), 4.f);
 			Body(GameMode ? GameMode->ArcadeFailReason : FString(), 34.f, Lavender, 14.f);
-			Body(FString::Printf(TEXT("score  %d / %d"), GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->Score : 0, Challenge ? Challenge->TargetScore : 0), 30.f, Cyan, 10.f);
+			// How far the player got on each goal the step sets.
+			if (!Challenge || Challenge->TargetScore > 0)
+			{
+				Body(FString::Printf(TEXT("score  %d / %d"), GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->Score : 0, Challenge ? Challenge->TargetScore : 0), 30.f, Cyan, 10.f);
+			}
+			if (Challenge && Challenge->GoalRoutes > 0)
+			{
+				Body(FString::Printf(TEXT("routes  %d / %d"), FMath::Min(GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->RoutesCleared : 0, Challenge->GoalRoutes), Challenge->GoalRoutes), 30.f, Cyan, 10.f);
+			}
 			Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(280.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(280.f, 124.f)),
 				Sized(MakeTextButton(TEXT("RETRY"), FVector2D(380.f, 124.f), Emerald, Emerald2, ActArcadeRetry), FVector2D(380.f, 124.f))), 40.f);
 		}
@@ -980,8 +1005,8 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	{
 		Pages.Add({ TEXT("Bonus Tiles"),
 		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
-		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 1000 points, and a full potion (OUT) with an empty potion (IN) every 10000. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
-		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A chain from the full potion to the empty one is worth 1000.") });
+		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 200 points, and a full potion (OUT) with an empty potion (IN) every 600. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
+		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A pumpkin is worth 25 points and a potion 50, plus 2 for every tile of the chain. A chain from the full potion to the empty one is worth 100.") });
 	}
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{
@@ -1036,7 +1061,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 
 	UTextBlock* Body = MakeText(Page.Body, false, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 3.f);
 	Body->SetAutoWrapText(true);
-	Add(Body, 30.f, HAlign_Fill);
+	Add(Sized(Body, FVector2D(BodyWrapWidth, 0.f)), 30.f, HAlign_Center);
 
 	// Page dots.
 	UHorizontalBox* Dots = WidgetTree->ConstructWidget<UHorizontalBox>();

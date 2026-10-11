@@ -120,7 +120,8 @@ private:
 
 	// --- Builders ---
 	FSlateFontInfo Font(bool bTitle, float Size, float Outline = 4.f) const;
-	UTextBlock* MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline = 4.f);
+	// bFitWidth: a single line that comes from the campaign file shrinks to fit the card (titles always do).
+	UTextBlock* MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline = 4.f, bool bFitWidth = false);
 	UMaterialInstanceDynamic* MakePanelMID(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f, float Pressed = 0.f);
 	UImage* MakePanel(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f);
 	UImage* MakeIcon(float Shape, const FLinearColor& Color, float Size, float Fill = 1.f, float Glow = 0.f);

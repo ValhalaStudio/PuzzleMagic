@@ -57,5 +57,10 @@ private:
 	float FramingGroundZ = 30.f;
 	FVector2D LastViewportSize = FVector2D::ZeroVector;
 	FVector RestLocation = FVector::ZeroVector;
+	float FramingDistance = 0.f; // how far the camera stands from what it frames, set by UpdateFraming
+
+public:
+	float GetFramingDistance() const { return FramingDistance; }
+private:
 	float ShakeAmplitude = 0.f;
 };

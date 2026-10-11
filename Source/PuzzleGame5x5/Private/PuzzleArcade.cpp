@@ -292,6 +292,56 @@ void APuzzleGameMode::PuzzleArcadeTest(const FString& What)
 	}
 }
 
+void APuzzleGameMode::PuzzleUiCard(const FString& What, int32 A, int32 B, int32 Nonce)
+{
+	UPuzzleHUDWidget* UI = GetUI();
+	if (!UI)
+	{
+		return;
+	}
+	if (What == TEXT("menu"))
+	{
+		ShowMenu();
+	}
+	else if (What == TEXT("game"))
+	{
+		ShowMenu();
+		StartEndless();
+	}
+	else if (What == TEXT("courses"))   { UI->ShowCard(EPuzzleCard::Courses); }
+	else if (What == TEXT("options"))   { UI->ShowCard(EPuzzleCard::Options); }
+	else if (What == TEXT("pause"))     { UI->ShowCard(EPuzzleCard::Pause); }
+	else if (What == TEXT("gameover"))  { UI->ShowCard(EPuzzleCard::GameOver); }
+	else if (What == TEXT("howto"))     { UI->ShowTutorial(A); }
+	else if (What == TEXT("arcademenu") && HasCampaign(A))
+	{
+		ActiveKind = A;
+		UI->ShowCard(EPuzzleCard::ArcadeMenu);
+	}
+	else if (What == TEXT("arcadeintro") && HasCampaign(A))
+	{
+		ActiveKind = A;
+		StartArcade(B); // shows the intro popup of step B
+	}
+	else if (What == TEXT("arcadebegin"))
+	{
+		BeginArcadeChallenge();
+	}
+	else if (What == TEXT("arcadewin") || What == TEXT("arcadefail") || What == TEXT("arcadetime"))
+	{
+		PuzzleArcadeTest(What.RightChop(6)); // win, fail or time
+	}
+	else if (What == TEXT("arcadedone") && HasCampaign(A))
+	{
+		ActiveKind = A;
+		bArcade = true;
+		ArcadeIndex = GetArcadeCount() - 1;
+		ArcadeState = EArcadeState::Done;
+		Flow = EPuzzleFlow::Menu;
+		UI->ShowCard(EPuzzleCard::ArcadeDone);
+	}
+}
+
 void APuzzleGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

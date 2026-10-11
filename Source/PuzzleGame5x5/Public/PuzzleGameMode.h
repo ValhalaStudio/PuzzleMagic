@@ -101,6 +101,13 @@ public:
 	UFUNCTION(Exec)
 	void PuzzleArcadeTest(const FString& What);
 
+	// Test hook for the on-device interface sweep: shows one screen on demand. What is menu, courses, options, pause,
+	// gameover, game, howto (A = page), arcademenu (A = campaign 0 arcade / 1 tutorial), arcadeintro (A = campaign,
+	// B = step), arcadebegin, arcadewin, arcadefail, arcadetime, arcadedone (A = campaign). Nonce only makes each command text new, since the debug hook
+	// runs a command once per distinct text.
+	UFUNCTION(Exec)
+	void PuzzleUiCard(const FString& What, int32 A = 0, int32 B = 0, int32 Nonce = 0);
+
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	bool bPauseMenuOpen = false;
 
@@ -192,6 +199,11 @@ public:
 	// PuzzleHide <backdrop|bats|steam|board|light|ui> <0|1>   hides (1) or shows (0) that part of the scene.
 	UFUNCTION(Exec)
 	void PuzzleHide(const FString& What, int32 Hide);
+
+	// PuzzlePerf <max fps, 0 = no cap> <3D resolution in percent, 0 = leave> <1 = automatic resolution, 0 = fixed>
+	// Sets the frame cap and the render resolution of the lightweight scene in one go, for power measurements.
+	UFUNCTION(Exec)
+	void PuzzlePerf(int32 MaxFps, int32 ResPercent, int32 Adaptive);
 
 	UPuzzleHUDWidget* GetUI() const;
 

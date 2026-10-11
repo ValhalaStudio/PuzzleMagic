@@ -29,6 +29,9 @@ public:
 	// For measuring: hide or show one layer of the lightweight scenery ("backdrop", "bats" or "steam").
 	void SetLiteLayerHidden(const FString& Layer, bool bHide);
 
+	// For measuring power: switch the automatic resolution off (or on again) and, if Resolution is above 0, set it (0.35 to 1).
+	void SetPerfOverride(bool bAdapt, float Resolution);
+
 	// Where the two cauldrons stand (left is minus X) and how big they are. The defaults suit the 8x8 board; the actor
 	// re-fits them to the camera whenever the board size changes the framing.
 	UPROPERTY(EditAnywhere, Category = "Halloween")
@@ -133,6 +136,11 @@ private:
 	float LiteWindowWorst = 0.f;
 	int32 LiteWindowFrames = 0;
 	float LiteWarmup = 0.f;
+	// The scenery pictures sit behind the board, so their distances grow with the camera's (a wide screen with a big board
+	// pulls the camera back past the fixed distances, and the backdrop would cover the board).
+	float LiteDepthScale = 1.f;
+	float ComputeLiteDepthScale() const;
+	bool bAdaptResolution = true;
 	void RefreshLiteFrame();
 	UStaticMeshComponent* AddLiteQuad(UMaterialInterface* Material);
 	void PlaceOnBackdrop(UStaticMeshComponent* Quad, const FVector2D& ImageUV, float Depth, float HeightFraction, float WidthOverHeight, bool bFlipX);

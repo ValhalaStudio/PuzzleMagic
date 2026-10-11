@@ -140,6 +140,7 @@ void APuzzleCameraPawn::UpdateFraming()
 
 	const FRotator ViewRotation(ViewPitch, ViewYaw, 0.f);
 	const FVector Focus(Center.X, Center.Y, FramingGroundZ);
+	FramingDistance = Distance;
 	RestLocation = Focus - ViewRotation.Vector() * Distance;
 	SetActorLocationAndRotation(RestLocation, ViewRotation);
 }

@@ -383,6 +383,18 @@ void APuzzleGameMode::PlaySfx(USoundBase* Sound, float Volume, float Pitch) cons
 	}
 }
 
+void APuzzleGameMode::PuzzlePerf(int32 MaxFps, int32 ResPercent, int32 Adaptive)
+{
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		PC->ConsoleCommand(FString::Printf(TEXT("t.MaxFPS %d"), FMath::Max(MaxFps, 0)));
+	}
+	for (TActorIterator<AHalloweenProps> It(GetWorld()); It; ++It)
+	{
+		It->SetPerfOverride(Adaptive != 0, ResPercent > 0 ? ResPercent / 100.f : 0.f);
+	}
+}
+
 void APuzzleGameMode::PuzzleHide(const FString& What, int32 Hide)
 {
 	const bool bHide = Hide != 0;
