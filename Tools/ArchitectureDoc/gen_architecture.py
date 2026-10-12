@@ -571,6 +571,8 @@ FLAG_TEXT = {
 FLAG_ARG = {"grid": "=WxH", "tutorialpage": "=N", "dread": "=X", "recordaudio": "=N"}
 
 SCRIPTS = [
+    ("build_packages.ps1", "PowerShell", "Compiles the editor target and builds the Windows and Android test packages (finds the engine, retries a failed cook, zips Windows)."),
+    ("package_windows.py", "Python", "Zips a packaged Windows build with forward-slash paths, the campaign editor and the starter campaigns."),
     ("dev_chat_sync.py", "Python", "Appends the new messages of the Claude Code conversation to dev_chat.log in the project folder (a readable progress log kept for the designer; git-ignored)."),
     ("arcane_head.py", "Unreal editor Python", "Shared helpers for the material scripts: create or rebuild a material, custom HLSL nodes, parameters, and the NOISE and SYMBOLS HLSL libraries."),
     ("arcane_body.py", "Unreal editor Python", "M_TileArcane, M_HolyAura, M_PPInkOutline, M_UIPanel, M_UIIcon."),

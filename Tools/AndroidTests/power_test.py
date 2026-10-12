@@ -13,14 +13,24 @@ import numpy as np
 from PIL import Image
 
 ADB = os.path.join(os.environ["LOCALAPPDATA"], "Android", "Sdk", "platform-tools", "adb.exe")
-PHONE = "adb-9b0100593053313238002cd94a8d1c-iEitmO._adb-tls-connect._tcp"
+PHONE = os.environ.get("PM_DEVICE") or ""   # the adb serial; default: the only connected device
 PKG = "com.YourCompany.PuzzleMagic"
 ACT = PKG + "/com.epicgames.unreal.GameActivity"
-APK = r"K:\epic2\PuzzleMagic_Builds\PuzzleMagic_Android_test.apk"
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+BUILDS = os.environ.get("PM_BUILDS", os.path.join(os.path.dirname(REPO), "PuzzleMagic_Builds"))
+APK = os.environ.get("PM_APK", os.path.join(BUILDS, "PuzzleMagic_Android_test.apk"))
+OUTBASE = os.environ.get("PM_OUT", os.path.join(BUILDS, "AndroidTests"))
+os.makedirs(OUTBASE, exist_ok=True)
+if not PHONE:
+    _o = subprocess.run([ADB, "devices"], capture_output=True).stdout.decode("utf-8", "replace")
+    _d = [x.split()[0] for x in _o.splitlines()[1:] if x.strip() and x.split()[-1] == "device"]
+    if len(_d) != 1:
+        sys.exit("set PM_DEVICE to the adb serial (connected devices: %s)" % _d)
+    PHONE = _d[0]
 MIN = float(sys.argv[1]) if len(sys.argv) > 1 else 12.0
 WARM = 150  # seconds after a change that are not counted
-OUT = os.path.join(HERE, "power_" + datetime.datetime.now().strftime("%Y%m%d_%H%M"))
+OUT = os.path.join(OUTBASE, "power_" + datetime.datetime.now().strftime("%Y%m%d_%H%M"))
 os.makedirs(OUT, exist_ok=True)
 CONFIGS = {  # name: (max fps, resolution %, automatic resolution)
     "A uncapped (as shipped)": (0, 70, 1),

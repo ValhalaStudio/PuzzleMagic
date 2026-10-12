@@ -37,17 +37,21 @@ every bucket is used up"). Code: `CampaignData.*` (parsing), `PuzzleArcade.cpp` 
   The options card has a Landscape/Portrait toggle (saved). `bUseExternalFilesDir=True` is needed for saves on Android 11+.
 - Card titles shrink to fit the frame and long text wraps in a 640-unit box: wrapped text draws about 15% wider than its box.
 
-## Build and test
-- Compile: `Build.bat PuzzleGame5x5Editor Win64 Development -Project=...\PuzzleGame5x5.uproject -WaitMutex`
-- Packages: UAT `BuildCookRun` (Win64 Development; Android ASTC Development, NDK 27.2.12479018, JDK 21). The cook sometimes dies
-  at teardown with an engine ensure after printing "Done!": just retry.
-- Zip the Windows build with Python `zipfile` and forward-slash paths (`Compress-Archive` breaks other extractors).
+## Workflows (project skills in `.claude/skills/`, usable in any Claude Code session here)
+- `build-test-packages`: compile and build the Windows zip and the Android APK (`Tools/build_packages.ps1`, `Tools/package_windows.py`).
+- `device-test`: UI sweep, soak, frame rate and power tests on real phones/tablets (`Tools/AndroidTests/`, paths and devices are
+  discovered; `PM_BUILDS`, `PM_APK`, `PM_OUT`, `PM_DEVICE` override). Includes the rules that cost hours to learn.
+- `ui-overlap-check`: text and buttons must stay inside the cards on every screen shape.
+- `ship-changes`: commit, push to your fork, and prepare a pull request.
+
+## Build and test facts
+- Compile only: `Build.bat PuzzleGame5x5Editor Win64 Development -Project=...\PuzzleGame5x5.uproject -WaitMutex`.
+- The Android cook sometimes dies at teardown with an engine ensure after printing "Done!": just retry. Zip with forward slashes.
 - Material scripts (`Tools/*.py`) run through `UnrealEditor-Cmd -run=pythonscript` with the editor closed.
-- Device tests: `Tools/AndroidTests/` (soak.py, analyze_ui.py, power_test.py; serials are hard-coded, edit them). Debug commands on
-  a test build: `adb shell setprop debug.puzzle.exec '<console command>'` runs once per distinct text and again at every launch
-  (clear it with `''` or a stale command re-runs). Game commands: `PuzzleUiCard`, `PuzzlePerf`, `PuzzleHide`, `PuzzleArcadeTest`.
-- Wireless adb needs the phone and the PC on one network; `adb pair` then `adb connect`. A secure lock screen cannot be opened by adb.
-- Power can only be measured unplugged (the charger's own current drifts by +-100 mA); use the battery charge counter.
+- Debug commands on a test build: `adb shell setprop debug.puzzle.exec '<console command>'` runs once per distinct text and again at
+  every launch (clear it with `''`). Game commands: `PuzzleUiCard`, `PuzzlePerf`, `PuzzleHide`, `PuzzleArcadeTest`.
+- A secure lock screen cannot be opened by adb. Power can only be measured unplugged (use the battery charge counter).
 
 ## Conversation log
-`dev_chat.log` (git-ignored) is a readable copy of the designer's session, kept by `Tools/dev_chat_sync.py`.
+Optional: `python Tools/dev_chat_sync.py` appends your Claude Code session to `dev_chat.log` (git-ignored), a readable record you can
+scroll when the terminal cannot. It finds the newest transcript of this project by itself.

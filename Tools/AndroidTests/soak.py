@@ -15,14 +15,24 @@ from PIL import Image
 ADB = os.path.join(os.environ["LOCALAPPDATA"], "Android", "Sdk", "platform-tools", "adb.exe")
 PKG = "com.YourCompany.PuzzleMagic"
 ACT = PKG + "/com.epicgames.unreal.GameActivity"
-APK = r"K:epic2PuzzleMagic_BuildsPuzzleMagic_Android_test.apk"  # the packaged test APK
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(HERE))
+# Builds and test output live outside the repo: PM_BUILDS, default the folder PuzzleMagic_Builds next to the repo.
+BUILDS = os.environ.get("PM_BUILDS", os.path.join(os.path.dirname(REPO), "PuzzleMagic_Builds"))
+APK = os.environ.get("PM_APK", os.path.join(BUILDS, "PuzzleMagic_Android_test.apk"))
+OUTBASE = os.environ.get("PM_OUT", os.path.join(BUILDS, "AndroidTests"))
+os.makedirs(OUTBASE, exist_ok=True)
 HOURS = float(sys.argv[1]) if len(sys.argv) > 1 else 3.0
-SERIALS = sys.argv[2:] or [
-    "adb-BTC607B10XD3975-ZWwJve._adb-tls-connect._tcp",       # tablet
-    "adb-9b0100593053313238002cd94a8d1c-iEitmO._adb-tls-connect._tcp"]  # phone
+
+
+def connected_devices():
+    out = subprocess.run([ADB, "devices"], capture_output=True).stdout.decode("utf-8", "replace")
+    return [l.split()[0] for l in out.splitlines()[1:] if l.strip() and l.split()[-1] == "device"]
+
+
+SERIALS = sys.argv[2:] or connected_devices()   # default: every connected device
 DEADLINE = time.time() + HOURS * 3600
-RUN = os.path.join(HERE, "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M"))
+RUN = os.path.join(OUTBASE, "run_" + datetime.datetime.now().strftime("%Y%m%d_%H%M"))
 os.makedirs(RUN, exist_ok=True)
 
 # Where things are, as a fraction of the golden card's height (measured on a 1280x800 and an 800x1280 screen).
@@ -295,7 +305,7 @@ class Dev:
         info["battery"] = self.battery()
         self.log("device " + json.dumps(info))
         self.info = info
-        orig_file = os.path.join(HERE, "original_settings.json")
+        orig_file = os.path.join(OUTBASE, "original_settings.json")   # optional {serial: screen_off_timeout}
         known = json.load(open(orig_file)) if os.path.exists(orig_file) else {}
         self.restore["timeout"] = known.get(self.s) or self.adb("shell", "settings", "get", "system", "screen_off_timeout")
         self.adb("shell", "settings", "put", "system", "screen_off_timeout", "14400000")
