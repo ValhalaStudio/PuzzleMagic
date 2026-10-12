@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Puzzle Magic Campaign Editor</title>
+<style>
+:root {
+  --bg: #130b1d; --panel: #1e1330; --panel2: #281a40; --line: #3d2a5c; --ink: #efe6ff; --dim: #a893cf;
+  --gold: #ffb53b; --green: #2fae6a; --red: #d93a52; --cyan: #5cd3ff; --purple: #7a3fd1;
+  --t-black: #1b1b21; --t-purple: #6b1fc7; --t-red: #e0151a; --t-ash: #3a3d47;
+}
+@media (prefers-color-scheme: light) { :root { color-scheme: dark; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.4 "Segoe UI", system-ui, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+header { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+header h1 { margin: 0 8px 0 0; font: 700 20px Georgia, serif; color: var(--gold); letter-spacing: .5px; }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--gold); }
+.btn.primary { background: var(--purple); border-color: #a174ea; }
+.btn.small { padding: 3px 8px; font-size: 13px; }
+.btn.danger:hover { border-color: var(--red); color: #ffb3bf; }
+.btn:disabled { opacity: .4; cursor: default; }
+input[type=text], input[type=number], select, textarea { background: #170e26; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 100%; }
+input[type=number] { width: 90px; }
+textarea { resize: vertical; min-height: 70px; }
+label { color: var(--dim); font-size: 13px; }
+#status { margin-left: auto; font-size: 13px; color: var(--dim); }
+#status b { color: var(--gold); }
+main { display: grid; grid-template-columns: 280px 1fr; gap: 14px; padding: 14px 16px 40px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 8px; font: 700 15px Georgia, serif; color: var(--gold); letter-spacing: .4px; }
+.card h2 small { font: 400 12px "Segoe UI", sans-serif; color: var(--dim); margin-left: 6px; }
+#steps .step { display: flex; gap: 8px; align-items: center; padding: 7px 9px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
+#steps .step:hover { background: var(--panel2); }
+#steps .step.on { background: var(--panel2); border-color: var(--gold); }
+#steps .num { width: 24px; height: 24px; border-radius: 50%; background: var(--purple); display: grid; place-items: center; font-size: 12px; flex: none; }
+#steps .meta { font-size: 12px; color: var(--dim); }
+#steps .ttl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 8px; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field.grow { flex: 1 1 260px; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.checks label { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px; }
+.note { font-size: 12px; color: var(--dim); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+/* tiles */
+.tile { position: relative; width: 52px; height: 52px; border-radius: 9px; display: grid; place-items: center; border: 2px solid #0008; box-shadow: inset 0 -4px 0 #0005; flex: none; }
+.tile.black { background: var(--t-black); } .tile.purple { background: var(--t-purple); } .tile.red { background: var(--t-red); } .tile.ash { background: var(--t-ash); }
+.hand { font-size: 30px; line-height: 1; color: #efe3bf; display: block; }
+.tile.purple .hand, .tile.ash .hand { color: #fff; }
+.hand.up { transform: rotate(-90deg); } .hand.right { transform: rotate(0); } .hand.down { transform: rotate(90deg); } .hand.left { transform: rotate(180deg); }
+.tile.mini { width: 30px; height: 30px; border-radius: 6px; border-width: 1px; }
+.tile.mini .hand { font-size: 18px; }
+.tile.bonus { background: #2a1a3a; border-color: #0008; font-size: 28px; }
+.tile.bonus.pumpkin { background: radial-gradient(circle at 40% 35%, #ffb347, #c25a00); }
+.tile.bonus.fullPotion { background: radial-gradient(circle at 40% 35%, #ff6adf, #8a0a6e); }
+.tile.bonus.emptyPotion { background: #1b0d2a; outline: 2px solid #ff3cc8; outline-offset: -4px; }
+.tile.bonus.emptyPotion span { opacity: .55; }
+.mark { position: absolute; right: 2px; top: 1px; font-size: 10px; font-weight: 700; padding: 0 3px; border-radius: 4px; }
+.mark.s { background: #1f9d58; } .mark.e { background: #c0392b; }
+/* board */
+.boardwrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+#board { display: inline-grid; gap: 3px; padding: 8px; background: #0e0818; border: 2px solid #5a3f86; border-radius: 12px; }
+#board .cell { width: 52px; height: 52px; border-radius: 9px; background: #1a1128; border: 1px dashed #3d2a5c; display: grid; place-items: center; cursor: pointer; position: relative; padding: 0; }
+#board .cell:hover { border-color: var(--gold); }
+#board .cell .tile { width: 100%; height: 100%; }
+#board .axis { font-size: 10px; color: var(--dim); position: absolute; left: 3px; bottom: 1px; }
+.tools { display: flex; flex-direction: column; gap: 8px; flex: 1 1 300px; min-width: 260px; }
+.tools .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tools .group > span { width: 74px; color: var(--dim); font-size: 12px; }
+.sw { width: 34px; height: 34px; border-radius: 8px; border: 2px solid #0008; cursor: pointer; }
+.sw.on, .tb.on { outline: 3px solid var(--gold); outline-offset: 1px; }
+.tb { min-width: 38px; height: 34px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); cursor: pointer; }
+.tb:hover { border-color: var(--gold); }
+/* tray */
+.bucket { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: #1a1128; }
+.bucket .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bucket .head b { color: var(--gold); }
+.bucket .slots { display: flex; gap: 8px; flex-wrap: wrap; }
+.slot { min-width: 96px; min-height: 76px; border: 2px dashed #4a3470; border-radius: 10px; padding: 6px; display: grid; place-items: center; cursor: pointer; background: #140c20; }
+.slot:hover { border-color: var(--gold); }
+.slot.sel { border-style: solid; border-color: var(--gold); }
+.slot .empty { color: var(--dim); font-size: 12px; text-align: center; }
+.pgrid { display: inline-grid; gap: 2px; }
+.pgrid .pc { width: 30px; height: 30px; }
+#pieceEd { border: 2px solid var(--gold); border-radius: 12px; padding: 10px 12px; margin: 8px 0 4px; background: #231638; }
+#pieceEd .shapes { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.shapeBtn { border: 1px solid var(--line); border-radius: 8px; padding: 4px; background: var(--panel2); cursor: pointer; }
+.shapeBtn.on { outline: 3px solid var(--gold); }
+.warn { padding: 5px 9px; border-radius: 6px; margin-bottom: 4px; font-size: 13px; }
+.warn.w { background: #4a3300; border: 1px solid #a67400; }
+.warn.i { background: #14344a; border: 1px solid #2b7aa8; }
+.warn.ok { background: #123d27; border: 1px solid #2e8f58; }
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #2d1b4a; border: 1px solid var(--gold); padding: 9px 16px; border-radius: 10px; display: none; z-index: 9; max-width: 80vw; }
+#drop { position: fixed; inset: 0; background: #130b1dcc; display: none; place-items: center; font-size: 26px; color: var(--gold); z-index: 8; border: 4px dashed var(--gold); }
+details summary { cursor: pointer; color: var(--dim); }
+.help { font-size: 13px; color: var(--dim); }
+.help code { background: #170e26; padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Puzzle Magic &middot; Campaign Editor</h1>
+  <button class="btn" id="bNew">New</button>
+  <button class="btn" id="bOpen">Open&hellip;</button>
+  <button class="btn primary" id="bSave">Save</button>
+  <button class="btn" id="bSaveAs">Save as&hellip;</button>
+  <button class="btn" id="bUndo" title="Ctrl+Z">Undo</button>
+  <button class="btn" id="bRedo" title="Ctrl+Y">Redo</button>
+  <span class="field" style="flex-direction:row;align-items:center;gap:6px"><label for="kind">Kind</label>
+    <select id="kind" style="width:auto"><option value="arcade">Arcade (challenges)</option><option value="tutorial">Tutorial (steps)</option></select></span>
+  <span class="field" style="flex-direction:row;align-items:center;gap:6px"><label for="cname">Name</label><input type="text" id="cname" style="width:180px"></span>
+  <span id="status"></span>
+  <input type="file" id="fileIn" accept=".json,application/json" hidden>
+</header>
+
+<main>
+  <aside>
+    <div class="card">
+      <h2>Steps <small id="stepCount"></small></h2>
+      <div id="steps"></div>
+      <div class="row" style="margin:10px 0 0;gap:6px">
+        <button class="btn small" id="sAdd">+ Add</button>
+        <button class="btn small" id="sDup">Duplicate</button>
+        <button class="btn small" id="sUp" title="Move up">&uarr;</button>
+        <button class="btn small" id="sDown" title="Move down">&darr;</button>
+        <button class="btn small danger" id="sDel">Delete</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Finale popup</h2>
+      <textarea id="finale" placeholder="Shown after the last step is beaten."></textarea>
+    </div>
+    <div class="card help">
+      <h2>Using the file</h2>
+      Save it as <code>arcade.json</code> or <code>tutorial.json</code>. To try it, put it in a <code>Campaigns</code> folder next to the game
+      (<code>PuzzleGame5x5/Campaigns/</code> in the packaged build) &mdash; no rebuild needed. To ship it, put it in the project's
+      <code>Content/Campaigns/</code>.
+    </div>
+  </aside>
+
+  <section id="editor"></section>
+</main>
+
+<div id="toast"></div>
+<div id="drop">Drop a campaign .json file to open it</div>
+
+<script>
+"use strict";
+// ------------------------------------------------------------------------------------------------------------------
+// Data. The file format (version 1) is what the game reads: see Source/PuzzleGame5x5/Private/CampaignData.cpp.
+// Board coordinates: x counts from the left column, y from the BOTTOM row. Directions: up, right, down, left.
+// ------------------------------------------------------------------------------------------------------------------
+const COLORS = ["black", "purple", "red", "ash"];
+const DIRS = ["up", "right", "down", "left"];
+const DV = { up: [0, 1], right: [1, 0], down: [0, -1], left: [-1, 0] };
+const SHAPES = [
+  { name: "Single", cells: [[0,0]] },
+  { name: "Line 2 across", cells: [[0,0],[1,0]] },
+  { name: "Line 2 up", cells: [[0,0],[0,1]] },
+  { name: "Line 3 across", cells: [[0,0],[1,0],[2,0]] },
+  { name: "Line 3 up", cells: [[0,0],[0,1],[0,2]] },
+  { name: "Line 4 across", cells: [[0,0],[1,0],[2,0],[3,0]] },
+  { name: "Line 4 up", cells: [[0,0],[0,1],[0,2],[0,3]] },
+  { name: "Square", cells: [[0,0],[1,0],[0,1],[1,1]] },
+  { name: "Angle (missing top right)", cells: [[0,0],[1,0],[0,1]] },
+  { name: "Angle (missing top left)", cells: [[0,0],[1,0],[1,1]] },
+  { name: "Angle (missing bottom right)", cells: [[0,1],[1,1],[0,0]] },
+  { name: "Angle (missing bottom left)", cells: [[1,0],[0,1],[1,1]] },
+];
+
+function newStep(title) {
+  return { title: title || "New step", goal: 100, goalRoutes: 0, timeLimit: 0, grid: [5, 5],
+    goalBuckets: false, holdSlot: true,
+    relics: { holyLight: false, reroll: false, holyLightCharges: 1, rerollCharges: 1 }, bonus: { pumpkin: false, fullPotion: false, emptyPotion: false },
+    intro: "", outro: "", hint: "", board: [], tray: { after: "random", buckets: [], rerollAfter: "random", rerollBuckets: [] } };
+}
+function newCampaign() {
+  return { format: 1, kind: "arcade", name: "Arcade", finale: "", steps: [newStep("First challenge")] };
+}
+
+// ------------------------------------------------------------------------------------------------------------------
+// State, undo, dirty tracking.
+// ------------------------------------------------------------------------------------------------------------------
+let camp = newCampaign();
+let cur = 0;                 // selected step
+let tool = { type: "tile", color: "red", dir: "right" };
+let sel = null;              // {bucket, slot} being edited in the tray
+let dirty = false, fileName = "", fileHandle = null;
+let undoStack = [], redoStack = [], lastSnap = JSON.stringify(camp), lastKey = "", lastTime = 0;
+
+const $ = (id) => document.getElementById(id);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const step = () => camp.steps[cur];
+
+function commit(key) {
+  // Every edit is one undo step; typing in the same field within a moment is merged into one.
+  const now = Date.now();
+  const snap = JSON.stringify(camp);
+  if (snap === lastSnap) return;
+  if (!(key && key === lastKey && now - lastTime < 900)) { undoStack.push(lastSnap); if (undoStack.length > 80) undoStack.shift(); }
+  lastSnap = snap; lastKey = key || ""; lastTime = now; redoStack = [];
+  dirty = true; saveDraft(); renderTop();
+}
+function restore(snap) {
+  camp = JSON.parse(snap); lastSnap = snap; lastKey = ""; cur = Math.min(cur, camp.steps.length - 1); sel = null;
+  dirty = true; saveDraft(); renderAll();
+}
+function undo() { if (!undoStack.length) return; redoStack.push(lastSnap); restore(undoStack.pop()); }
+function redo() { if (!redoStack.length) return; undoStack.push(lastSnap); restore(redoStack.pop()); }
+let draftTimer = null;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => { try { localStorage.setItem("pmCampaignDraft", JSON.stringify({ camp, fileName })); } catch (e) {} }, 400);
+}
+function toast(msg, ms) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.style.display = "none"; }, ms || 3500);
+}
+
+// ------------------------------------------------------------------------------------------------------------------
+// Validation and clean-up.
+// ------------------------------------------------------------------------------------------------------------------
+function isStarter(x, y, dir, w, h) { return (dir === "up" && y === 0) || (dir === "right" && x === 0) || (dir === "down" && y === h - 1) || (dir === "left" && x === w - 1); }
+function isEnder(x, y, dir, w, h) { return (dir === "up" && y === h - 1) || (dir === "right" && x === w - 1) || (dir === "down" && y === 0) || (dir === "left" && x === 0); }
+
+function routesOnBoard(s) {
+  // The chains the starting tiles already form, using the game's rule: a chain begins on a starter, follows the tiles and
+  // leaves the board through an ender.
+  const [w, h] = s.grid; const map = new Map();
+  for (const t of s.board) if (!t.bonus) map.set(t.x + "," + t.y, t);
+  const found = [];
+  for (const t of s.board) {
+    if (t.bonus || !isStarter(t.x, t.y, t.dir, w, h)) continue;
+    let c = t, len = 0, seen = new Set();
+    while (c && !seen.has(c.x + "," + c.y)) {
+      seen.add(c.x + "," + c.y); len++;
+      const n = [c.x + DV[c.dir][0], c.y + DV[c.dir][1]];
+      if (n[0] < 0 || n[1] < 0 || n[0] >= w || n[1] >= h) { if (len >= 2) found.push(len); break; }
+      c = map.get(n[0] + "," + n[1]);
+    }
+  }
+  return found;
+}
+
+function checks(s, idx) {
+  const out = [];
+  const [w, h] = s.grid;
+  const bucketGoal = s.goalBuckets && s.tray.buckets.length > 0;
+  if (s.goalBuckets && !s.tray.buckets.length) out.push(["w", "\"Win when every bucket is used up\" is on but there are no buckets, so it is ignored."]);
+  if (!s.goal && !s.goalRoutes && !bucketGoal) out.push(["w", "No goal is set: the game will use a goal of 1 point. Set a score goal, a route goal or the bucket goal."]);
+  if (bucketGoal && (s.goal || s.goalRoutes)) out.push(["i", "The step is won only when every goal is met, so the score or routes must be reached by the time the last piece is placed."]);
+  if (bucketGoal && !s.timeLimit) out.push(["i", "The step ends the moment the last piece is placed (or fails if the other goals are not met by then)."]);
+  if (s.tray.rerollBuckets.length && !s.relics.reroll) out.push(["i", "The reroll buckets are not used because the Reroll relic is switched off."]);
+  if (s.relics.holyLight && s.relics.holyLightCharges === 0 || s.relics.reroll && s.relics.rerollCharges === 0) out.push(["i", "A relic with 0 starting charges can only be earned through combos."]);
+  if (s.timeLimit && s.timeLimit < 10) out.push(["w", "A time limit under 10 seconds is very short."]);
+  const maxCells = Math.max(0, ...s.tray.buckets.map(b => b.length));
+  if (s.tray.buckets.some(b => b.length === 0)) out.push(["i", "An empty bucket is skipped by the game."]);
+  for (const t of s.board) if (t.x >= w || t.y >= h) out.push(["w", "A starting tile at (" + t.x + "," + t.y + ") is outside the board and will be ignored."]);
+  const rs = routesOnBoard(s);
+  if (rs.length) out.push(["w", "The starting tiles already form " + rs.length + " complete route" + (rs.length > 1 ? "s" : "") + ", which will clear with the player's first move."]);
+  if (s.tray.buckets.length && s.tray.after === "end" && !bucketGoal) out.push(["i", "The tray will run out after the last bucket: the step is lost if the goal is not met by then."]);
+  if (s.tray.buckets.length) {
+    const cells = s.tray.buckets.reduce((n, b) => n + b.reduce((m, p) => m + p.cells.length, 0), 0);
+    const free = w * h - s.board.length;
+    if (s.tray.after === "end" && cells > free) out.push(["i", "The buckets hold " + cells + " tiles but the board has only " + free + " free cells, so the player cannot place them all."]);
+  }
+  if (!out.length) out.push(["ok", "No problems found."]);
+  return out;
+}
+
+function clean(c) {
+  const o = clone(c); o.format = 1;
+  for (const s of o.steps) {
+    const [w, h] = s.grid;
+    s.board = s.board.filter(t => t.x >= 0 && t.y >= 0 && t.x < w && t.y < h);
+    s.tray.buckets = s.tray.buckets.filter(b => b.length > 0);
+    s.tray.rerollBuckets = s.tray.rerollBuckets.filter(b => b.length > 0);
+    // Using up every bucket needs buckets, and a tray that stays empty after the last one.
+    if (!s.tray.buckets.length) s.goalBuckets = false;
+    if (s.goalBuckets) s.tray.after = "end";
+    for (const k of ["holyLightCharges", "rerollCharges"]) s.relics[k] = Math.min(3, Math.max(0, Math.round(+s.relics[k])));
+    s.goal = Math.max(0, Math.round(+s.goal || 0)); s.goalRoutes = Math.max(0, Math.round(+s.goalRoutes || 0));
+    s.timeLimit = Math.max(0, Math.round(+s.timeLimit || 0));
+  }
+  return o;
+}
+
+function pretty(o) {
+  let t = JSON.stringify(o, null, 2);
+  // Keep short flat arrays ([0, 1] and ["up", "right"]) on one line.
+  t = t.replace(/\[\s*((?:"[^"\\\n]*"|-?\d+(?:\.\d+)?)(?:,\s*(?:"[^"\\\n]*"|-?\d+(?:\.\d+)?))*)\s*\]/g, (m, inner) => "[" + inner.replace(/,\s+/g, ", ") + "]");
+  // Board tiles on one line each.
+  t = t.replace(/\{\s+"x": (-?\d+),\s+"y": (-?\d+),\s+"color": ("[a-z]+"),\s+"dir": ("[a-z]+")\s+\}/g, '{ "x": $1, "y": $2, "color": $3, "dir": $4 }');
+  t = t.replace(/\{\s+"x": (-?\d+),\s+"y": (-?\d+),\s+"bonus": ("[A-Za-z]+")\s+\}/g, '{ "x": $1, "y": $2, "bonus": $3 }');
+  return t + "\n";
+}
+
+// ------------------------------------------------------------------------------------------------------------------
+// File handling.
+// ------------------------------------------------------------------------------------------------------------------
+function normalise(raw) {
+  if (!raw || !Array.isArray(raw.steps)) throw new Error('This does not look like a campaign file (no "steps" list).');
+  const c = { format: 1, kind: raw.kind === "tutorial" ? "tutorial" : "arcade", name: String(raw.name || ""), finale: String(raw.finale || ""), steps: [] };
+  for (const r of raw.steps) {
+    const s = newStep(String(r.title || "Untitled"));
+    s.goal = +r.goal || 0; s.goalRoutes = +r.goalRoutes || 0; s.timeLimit = +r.timeLimit || 0;
+    if (Array.isArray(r.grid) && r.grid.length === 2) s.grid = [Math.min(8, Math.max(4, +r.grid[0] || 5)), Math.min(8, Math.max(4, +r.grid[1] || 5))];
+    const ch = (v) => { v = Math.round(+v); return isNaN(v) ? 1 : Math.min(3, Math.max(0, v)); };
+    s.goalBuckets = !!r.goalBuckets; s.holdSlot = r.holdSlot !== false;
+    s.relics = { holyLight: !!(r.relics && r.relics.holyLight), reroll: !!(r.relics && r.relics.reroll),
+      holyLightCharges: ch(r.relics && r.relics.holyLightCharges !== undefined ? r.relics.holyLightCharges : 1),
+      rerollCharges: ch(r.relics && r.relics.rerollCharges !== undefined ? r.relics.rerollCharges : 1) };
+    s.bonus = { pumpkin: !!(r.bonus && r.bonus.pumpkin), fullPotion: !!(r.bonus && r.bonus.fullPotion), emptyPotion: !!(r.bonus && r.bonus.emptyPotion) };
+    s.intro = String(r.intro || ""); s.outro = String(r.outro || ""); s.hint = String(r.hint || "");
+    for (const t of (r.board || [])) {
+      const x = +t.x | 0, y = +t.y | 0;
+      if (t.bonus) s.board.push({ x, y, bonus: String(t.bonus) });
+      else s.board.push({ x, y, color: COLORS.includes(t.color) ? t.color : "red", dir: DIRS.includes(t.dir) ? t.dir : "up" });
+    }
+    const tr = r.tray || {};
+    s.tray.after = ["random", "loop", "end"].includes(tr.after) ? tr.after : "random";
+    s.tray.rerollAfter = tr.rerollAfter === "loop" ? "loop" : "random";
+    for (const [src, dst] of [[tr.buckets, s.tray.buckets], [tr.rerollBuckets, s.tray.rerollBuckets]]) {
+      for (const b of (src || [])) {
+        const bucket = [];
+        for (const p of b) {
+          if (!Array.isArray(p.cells) || !p.cells.length) continue;
+          const mx = Math.min(...p.cells.map(c => c[0])), my = Math.min(...p.cells.map(c => c[1]));
+          bucket.push({ cells: p.cells.map(c => [c[0] - mx, c[1] - my]), dirs: p.cells.map((_, i) => DIRS.includes((p.dirs || [])[i]) ? p.dirs[i] : "up"), color: COLORS.includes(p.color) ? p.color : "red" });
+        }
+        if (bucket.length) dst.push(bucket.slice(0, 3));
+      }
+    }
+    c.steps.push(s);
+  }
+  if (!c.steps.length) c.steps.push(newStep("First challenge"));
+  return c;
+}
+function loadText(text, name, handle) {
+  try { camp = normalise(JSON.parse(text)); } catch (e) { toast("Could not open that file: " + e.message, 6000); return; }
+  fileName = name || ""; fileHandle = handle || null; cur = 0; sel = null;
+  lastSnap = JSON.stringify(camp); undoStack = []; redoStack = []; dirty = false; renderAll(); toast("Opened " + (name || "campaign") + " (" + camp.steps.length + " steps).");
+}
+async function openFile() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await window.showOpenFilePicker({ types: [{ description: "Campaign", accept: { "application/json": [".json"] } }] });
+      const f = await h.getFile(); loadText(await f.text(), f.name, h);
+    } catch (e) { if (e && e.name !== "AbortError") toast("Could not open: " + e.message, 5000); }
+  } else $("fileIn").click();
+}
+$("fileIn").addEventListener("change", async (e) => { const f = e.target.files[0]; if (f) loadText(await f.text(), f.name, null); e.target.value = ""; });
+
+function suggestedName() { return camp.kind === "tutorial" ? "tutorial.json" : "arcade.json"; }
+async function save(forceAs) {
+  const text = pretty(clean(camp));
+  try {
+    if (window.showSaveFilePicker) {
+      if (!fileHandle || forceAs) fileHandle = await window.showSaveFilePicker({ suggestedName: fileName || suggestedName(), types: [{ description: "Campaign", accept: { "application/json": [".json"] } }] });
+      const w = await fileHandle.createWritable(); await w.write(text); await w.close(); fileName = fileHandle.name;
+    } else {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      a.download = fileName || suggestedName(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      fileName = a.download;
+    }
+    dirty = false; renderTop(); toast("Saved " + fileName + ". Put it in the game's Campaigns folder.");
+  } catch (e) { if (e && e.name !== "AbortError") toast("Could not save: " + e.message, 6000); }
+}
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+// Drag a file onto the page to open it.
+let dragDepth = 0;
+window.addEventListener("dragenter", (e) => { e.preventDefault(); dragDepth++; $("drop").style.display = "grid"; });
+window.addEventListener("dragleave", (e) => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; $("drop").style.display = "none"; } });
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", async (e) => { e.preventDefault(); dragDepth = 0; $("drop").style.display = "none"; const f = e.dataTransfer.files[0]; if (f) loadText(await f.text(), f.name, null); });
+
+// ------------------------------------------------------------------------------------------------------------------
+// Rendering.
+// ------------------------------------------------------------------------------------------------------------------
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in (props || {})) {
+    if (k === "class") e.className = props[k]; else if (k === "text") e.textContent = props[k];
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), props[k]); else if (k === "style") e.style.cssText = props[k];
+    else if (props[k] !== false && props[k] !== undefined) e.setAttribute(k, props[k]);
+  }
+  for (const kid of kids) if (kid !== null && kid !== undefined) e.append(kid);
+  return e;
+}
+function handEl(dir) { return el("span", { class: "hand " + dir, text: "☞" }); }
+function tileEl(t, mini) {
+  if (t.bonus) {
+    const icon = t.bonus === "pumpkin" ? "🎃" : "🧪";
+    return el("div", { class: "tile bonus " + t.bonus + (mini ? " mini" : "") }, el("span", { text: icon }));
+  }
+  return el("div", { class: "tile " + t.color + (mini ? " mini" : "") }, handEl(t.dir));
+}
+function renderTop() {
+  $("kind").value = camp.kind; if (document.activeElement !== $("cname")) $("cname").value = camp.name;
+  $("status").innerHTML = (fileName ? "<b>" + fileName.replace(/</g, "&lt;") + "</b>" : "<b>unsaved</b>") + (dirty ? " &bull; changes not saved" : " &bull; saved");
+  $("bUndo").disabled = !undoStack.length; $("bRedo").disabled = !redoStack.length;
+  if (document.activeElement !== $("finale")) $("finale").value = camp.finale;
+}
+function stepLabel() { return camp.kind === "tutorial" ? "Step" : "Challenge"; }
+function renderSteps() {
+  const box = $("steps"); box.innerHTML = "";
+  camp.steps.forEach((s, i) => {
+    const goals = [s.goal ? s.goal + " pts" : "", s.goalRoutes ? s.goalRoutes + " routes" : "", s.timeLimit ? s.timeLimit + " s" : ""].filter(Boolean).join(" · ");
+    box.append(el("div", { class: "step" + (i === cur ? " on" : ""), onclick: () => { cur = i; sel = null; renderAll(); } },
+      el("span", { class: "num", text: i + 1 }),
+      el("div", { style: "min-width:0" }, el("div", { class: "ttl", text: s.title || "(untitled)" }), el("div", { class: "meta", text: s.grid[0] + "×" + s.grid[1] + (goals ? " · " + goals : "") }))));
+  });
+  $("stepCount").textContent = camp.steps.length + " in total";
+  $("sUp").disabled = cur === 0; $("sDown").disabled = cur === camp.steps.length - 1; $("sDel").disabled = camp.steps.length === 1;
+}
+
+function field(label, input, extra) { return el("div", { class: "field" + (extra ? " " + extra : "") }, el("label", { text: label }), input); }
+function numInput(get, set, min, max, key) {
+  const i = el("input", { type: "number", min, max, value: get() });
+  i.addEventListener("input", () => { let v = parseInt(i.value, 10); if (isNaN(v)) v = 0; set(Math.min(max, Math.max(min, v))); commit(key); renderSteps(); renderChecks(); });
+  i.addEventListener("change", () => { i.value = get(); });
+  return i;
+}
+function textInput(get, set, key, multi, ph) {
+  const i = el(multi ? "textarea" : "input", multi ? { placeholder: ph || "" } : { type: "text", placeholder: ph || "" });
+  i.value = get();
+  i.addEventListener("input", () => { set(i.value); commit(key); renderSteps(); });
+  return i;
+}
+function checkbox(label, get, set, key, redraw) {
+  const c = el("input", { type: "checkbox" }); c.checked = get();
+  c.addEventListener("change", () => { set(c.checked); commit(key); renderSteps(); if (redraw) renderEditor(); else renderChecks(); });
+  return el("label", {}, c, document.createTextNode(label));
+}
+
+function renderEditor() {
+  const s = step(), root = $("editor"); root.innerHTML = "";
+  // --- Rules
+  const rules = el("div", { class: "card" }, el("h2", { text: stepLabel() + " " + (cur + 1) + " — rules" }));
+  rules.append(el("div", { class: "row" },
+    field("Title", textInput(() => s.title, (v) => { s.title = v; }, "title:" + cur, false, "Shown in the popups and on screen"), "grow"),
+    field("Goal: reach score", numInput(() => s.goal, (v) => { s.goal = v; }, 0, 99999, "goal:" + cur)),
+    field("Goal: clear routes", numInput(() => s.goalRoutes, (v) => { s.goalRoutes = v; }, 0, 99, "gr:" + cur)),
+    field("Time limit (seconds, 0 = none)", numInput(() => s.timeLimit, (v) => { s.timeLimit = v; }, 0, 3600, "tl:" + cur)),
+    field("Board width", numInput(() => s.grid[0], (v) => { s.grid[0] = v; }, 4, 8, "gw:" + cur)),
+    field("Board height", numInput(() => s.grid[1], (v) => { s.grid[1] = v; }, 4, 8, "gh:" + cur))));
+  rules.append(el("div", { class: "checks", style: "margin:6px 0" }, checkbox("Also win only after every preset bucket has been used up (the tray then ends after the last bucket)", () => s.goalBuckets, (v) => { s.goalBuckets = v; if (v) s.tray.after = "end"; }, "", true)));
+  rules.append(el("div", { class: "checks", style: "margin:6px 0" }, checkbox("Hold slot: the fourth tray slot where the player can park a piece", () => s.holdSlot, (v) => { s.holdSlot = v; }, "")));
+  rules.append(el("div", { class: "note", text: "The step is won when every goal that is set is met. Leave one at 0 to ignore it." }));
+  const relics = el("div", { class: "field", style: "margin-top:10px" }, el("label", { text: "Relics (either one switches combos and luck on)" }),
+    el("div", { class: "checks" }, checkbox("Holy Light", () => s.relics.holyLight, (v) => { s.relics.holyLight = v; }, "", true), checkbox("Reroll", () => s.relics.reroll, (v) => { s.relics.reroll = v; }, "", true)),
+    el("div", { class: "row", style: "margin:8px 0 0" },
+      field("Holy Light charges at the start", numInput(() => s.relics.holyLightCharges, (v) => { s.relics.holyLightCharges = v; }, 0, 3, "hlc:" + cur)),
+      field("Reroll charges at the start", numInput(() => s.relics.rerollCharges, (v) => { s.relics.rerollCharges = v; }, 0, 3, "rrc:" + cur))),
+    el("div", { class: "note", text: "The game default is 1 of each. A relic only matters when its box is ticked." }));
+  const bonus = el("div", { class: "field", style: "margin-top:10px" }, el("label", { text: "Bonus tiles that drop as the score grows" }),
+    el("div", { class: "checks" }, checkbox("Pumpkin", () => s.bonus.pumpkin, (v) => { s.bonus.pumpkin = v; }, ""), checkbox("Full potion", () => s.bonus.fullPotion, (v) => { s.bonus.fullPotion = v; }, ""), checkbox("Empty potion", () => s.bonus.emptyPotion, (v) => { s.bonus.emptyPotion = v; }, "")));
+  rules.append(el("div", { class: "cols" }, relics, bonus));
+  root.append(rules);
+
+  // --- Texts
+  const texts = el("div", { class: "card" }, el("h2", { text: "Popups and hint" }));
+  texts.append(el("div", { class: "cols" },
+    field("Before the step (intro popup)", textInput(() => s.intro, (v) => { s.intro = v; }, "in:" + cur, true, "Text the player reads before starting. The rules are listed above it automatically.")),
+    field("After the step (outro popup)", textInput(() => s.outro, (v) => { s.outro = v; }, "out:" + cur, true, "Text shown when the step is won.")),
+    field("Hint on screen while playing", textInput(() => s.hint, (v) => { s.hint = v; }, "hint:" + cur, true, "A short line under the goal, for example \"Fill the row\"."))));
+  root.append(texts);
+
+  // --- Board
+  const board = el("div", { class: "card", id: "boardCard" }); root.append(board); renderBoard();
+  // --- Tray
+  const tray = el("div", { class: "card", id: "trayCard" }); root.append(tray);
+  const rr = el("div", { class: "card", id: "rerollCard" }); root.append(rr); renderTray();
+  // --- Checks
+  const chk = el("div", { class: "card", id: "checkCard" }); root.append(chk); renderChecks();
+}
+
+function renderChecks() {
+  const c = $("checkCard"); if (!c) return; c.innerHTML = ""; c.append(el("h2", { text: "Check" }));
+  for (const [k, m] of checks(step(), cur)) c.append(el("div", { class: "warn " + k, text: m }));
+}
+
+// ----- board painter
+function cellAt(s, x, y) { return s.board.findIndex(t => t.x === x && t.y === y); }
+function applyTool(x, y, erase) {
+  const s = step(), i = cellAt(s, x, y);
+  if (erase || tool.type === "erase") { if (i >= 0) s.board.splice(i, 1); }
+  else if (tool.type === "rotate") { if (i >= 0 && !s.board[i].bonus) s.board[i].dir = DIRS[(DIRS.indexOf(s.board[i].dir) + 1) % 4]; }
+  else {
+    const t = tool.type === "tile" ? { x, y, color: tool.color, dir: tool.dir } : { x, y, bonus: tool.type };
+    if (i >= 0) { const o = s.board[i]; if (JSON.stringify(o) === JSON.stringify(t)) s.board.splice(i, 1); else s.board[i] = t; } else s.board.push(t);
+  }
+  commit(); renderBoard(); renderChecks(); renderSteps();
+}
+function renderBoard() {
+  const card = $("boardCard"); if (!card) return; card.innerHTML = "";
+  const s = step(), [w, h] = s.grid;
+  card.append(el("h2", {}, document.createTextNode("Starting board"), el("small", { text: "tiles that are already on the board when the step starts" })));
+  const wrap = el("div", { class: "boardwrap" });
+  const tools = el("div", { class: "tools" });
+  const colorRow = el("div", { class: "group" }, el("span", { text: "Colour" }));
+  for (const c of COLORS) colorRow.append(el("div", { class: "sw tile " + c + (tool.type === "tile" && tool.color === c ? " on" : ""), title: c, onclick: () => { tool = { ...tool, type: "tile", color: c }; renderBoard(); } }));
+  const dirRow = el("div", { class: "group" }, el("span", { text: "Direction" }));
+  const arrows = { up: "↑", right: "→", down: "↓", left: "←" };
+  for (const d of DIRS) dirRow.append(el("button", { class: "tb" + (tool.dir === d ? " on" : ""), title: "Hand pointing " + d, text: arrows[d], onclick: () => { tool = { ...tool, dir: d }; renderBoard(); } }));
+  const kindRow = el("div", { class: "group" }, el("span", { text: "Tool" }));
+  const tb = (type, label, title) => el("button", { class: "tb" + (tool.type === type ? " on" : ""), title, text: label, onclick: () => { tool = { ...tool, type }; renderBoard(); } });
+  kindRow.append(tb("tile", "Tile", "Place a tile with the colour and direction chosen above"), tb("rotate", "Rotate", "Click a tile to turn its hand"), tb("pumpkin", "🎃", "Pumpkin"), tb("fullPotion", "🧪 full", "Full potion (outgoing)"), tb("emptyPotion", "🧪 empty", "Empty potion (incoming)"), tb("erase", "Erase", "Remove a tile (right-click does this too)"));
+  const actionRow = el("div", { class: "group" }, el("span", { text: "Board" }), el("button", { class: "btn small danger", text: "Clear all", onclick: () => { s.board = []; commit(); renderBoard(); renderChecks(); renderSteps(); } }));
+  tools.append(colorRow, dirRow, kindRow, actionRow,
+    el("div", { class: "note", text: "Click a cell to place, click the same tile again to remove it. The green S marks a tile that can start a route, the red E one that can end it. Row 0 is the bottom row." }));
+  const grid = el("div", { id: "board", style: "grid-template-columns: repeat(" + w + ", 52px)" });
+  for (let y = h - 1; y >= 0; y--) for (let x = 0; x < w; x++) {
+    const i = cellAt(s, x, y), t = i >= 0 ? s.board[i] : null;
+    const cell = el("button", { class: "cell", title: "(" + x + ", " + y + ")", onclick: () => applyTool(x, y, false), oncontextmenu: (e) => { e.preventDefault(); applyTool(x, y, true); } });
+    if (t) {
+      const te = tileEl(t); cell.append(te);
+      if (!t.bonus) {
+        if (isStarter(x, y, t.dir, w, h)) te.append(el("span", { class: "mark s", text: "S" }));
+        else if (isEnder(x, y, t.dir, w, h)) te.append(el("span", { class: "mark e", text: "E" }));
+      }
+    } else if (x === 0 || y === 0) { cell.append(el("span", { class: "axis", text: (x === 0 && y === 0) ? "0,0" : (x === 0 ? y : x) })); }
+    grid.append(cell);
+  }
+  wrap.append(grid, tools); card.append(wrap);
+}
+
+// ----- tray designer
+function newPiece(shapeIdx, color) {
+  const sh = SHAPES[shapeIdx]; return { cells: clone(sh.cells), dirs: sh.cells.map(() => "right"), color: color || "red" };
+}
+function shapeIndexOf(p) {
+  const key = JSON.stringify(p.cells.map(c => c.join(",")).sort());
+  return SHAPES.findIndex(sh => JSON.stringify(sh.cells.map(c => c.join(",")).sort()) === key);
+}
+function pieceGrid(p, small) {
+  const w = Math.max(...p.cells.map(c => c[0])) + 1, h = Math.max(...p.cells.map(c => c[1])) + 1;
+  const g = el("div", { class: "pgrid", style: "grid-template-columns: repeat(" + w + ", " + (small ? 30 : 38) + "px)" });
+  for (let y = h - 1; y >= 0; y--) for (let x = 0; x < w; x++) {
+    const i = p.cells.findIndex(c => c[0] === x && c[1] === y);
+    g.append(i >= 0 ? tileEl({ color: p.color, dir: p.dirs[i] }, true) : el("div", { style: "width:" + (small ? 30 : 38) + "px;height:" + (small ? 30 : 38) + "px" }));
+  }
+  return g;
+}
+function renderTray() { drawTray("trayCard", "buckets"); drawTray("rerollCard", "rerollBuckets"); }
+function drawTray(cardId, key) {
+  const card = $(cardId); if (!card) return; card.innerHTML = "";
+  const s = step(), buckets = s.tray[key], isReroll = key === "rerollBuckets";
+  card.style.display = isReroll && !s.relics.reroll ? "none" : "";
+  card.append(el("h2", {}, document.createTextNode(isReroll ? "Reroll buckets" : "Curated tray"),
+    el("small", { text: isReroll ? "the pieces each Reroll deals, in order (leave empty for random pieces)" : "the pieces the player is dealt, in order (leave empty for random pieces)" })));
+  card.append(el("div", { class: "note", style: "margin-bottom:8px", text: isReroll
+    ? "Each time the player uses a Reroll, the whole tray is replaced by the next bucket here. Without buckets a Reroll deals random pieces. Rerolls do not use up the tray buckets above."
+    : "A bucket is the set of up to three pieces on the tray at one time. When the player has used them all, the next bucket is dealt." }));
+  buckets.forEach((b, bi) => {
+    const head = el("div", { class: "head" }, el("b", { text: "Bucket " + (bi + 1) }),
+      el("button", { class: "btn small", text: "Duplicate", onclick: () => { buckets.splice(bi + 1, 0, clone(b)); sel = null; commit(); renderTray(); renderChecks(); } }),
+      el("button", { class: "btn small", text: "↑", disabled: bi === 0, onclick: () => { [buckets[bi - 1], buckets[bi]] = [buckets[bi], buckets[bi - 1]]; sel = null; commit(); renderTray(); } }),
+      el("button", { class: "btn small", text: "↓", disabled: bi === buckets.length - 1, onclick: () => { [buckets[bi + 1], buckets[bi]] = [buckets[bi], buckets[bi + 1]]; sel = null; commit(); renderTray(); } }),
+      el("button", { class: "btn small danger", text: "Delete", onclick: () => { buckets.splice(bi, 1); sel = null; commit(); renderTray(); renderChecks(); } }));
+    const slots = el("div", { class: "slots" });
+    for (let si = 0; si < 3; si++) {
+      const p = b[si], on = sel && sel.list === key && sel.bucket === bi && sel.slot === si;
+      slots.append(el("div", { class: "slot" + (on ? " sel" : ""), onclick: () => { sel = on ? null : { list: key, bucket: bi, slot: si }; if (!p && sel) { if (si > b.length) sel.slot = b.length; } renderTray(); } },
+        p ? pieceGrid(p) : el("div", { class: "empty", text: si === b.length ? "+ add piece" : "—" })));
+    }
+    card.append(el("div", { class: "bucket" }, head, slots));
+  });
+  card.append(el("div", { class: "row" },
+    el("button", { class: "btn small", text: "+ Add bucket", onclick: () => { buckets.push([newPiece(5, "purple")]); sel = { list: key, bucket: buckets.length - 1, slot: 0 }; commit(); renderTray(); renderChecks(); } }),
+    isReroll ? field("After the last bucket", (() => {
+      const sl = el("select", { style: "width:auto" }, el("option", { value: "random", text: "Deal random pieces" }), el("option", { value: "loop", text: "Start over with bucket 1" }));
+      sl.value = s.tray.rerollAfter; sl.addEventListener("change", () => { s.tray.rerollAfter = sl.value; commit(); renderChecks(); }); return sl;
+    })()) : (s.goalBuckets ? el("div", { class: "note", text: "After the last bucket the tray stays empty, because the step is won by using up every bucket." }) : field("After the last bucket", (() => {
+      const sl = el("select", { style: "width:auto" }, el("option", { value: "random", text: "Deal random pieces" }), el("option", { value: "loop", text: "Start over with bucket 1" }), el("option", { value: "end", text: "Deal nothing (the step is lost when pieces run out)" }));
+      sl.value = s.tray.after; sl.addEventListener("change", () => { s.tray.after = sl.value; commit(); renderChecks(); }); return sl;
+    })()))));
+  if (sel && sel.list === key && buckets[sel.bucket]) renderPieceEditor(card);
+}
+function renderPieceEditor(card) {
+  const s = step(), b = s.tray[sel.list][sel.bucket];
+  let p = b[sel.slot];
+  const ed = el("div", { id: "pieceEd" });
+  if (!p) {
+    ed.append(el("div", { text: "Bucket " + (sel.bucket + 1) + ", slot " + (sel.slot + 1) + ": choose a shape to add a piece." }));
+  } else ed.append(el("div", { text: "Editing bucket " + (sel.bucket + 1) + ", slot " + (sel.slot + 1) + " — click a tile to turn its hand." }));
+  const idx = p ? shapeIndexOf(p) : -1;
+  const shapes = el("div", { class: "shapes" });
+  SHAPES.forEach((sh, i) => {
+    const mini = { cells: sh.cells, dirs: sh.cells.map(() => "right"), color: p ? p.color : "purple" };
+    shapes.append(el("div", { class: "shapeBtn" + (i === idx ? " on" : ""), title: sh.name, onclick: () => {
+      const np = newPiece(i, p ? p.color : "purple");
+      if (p) { const old = p; np.dirs = np.cells.map((_, k) => old.dirs[k] || old.dirs[0] || "right"); b[sel.slot] = np; } else { b[b.length < 3 ? b.length : 2] = np; sel.slot = Math.min(sel.slot, b.length - 1); }
+      commit(); renderTray(); renderChecks(); } }, pieceGrid(mini, true)));
+  });
+  ed.append(shapes);
+  if (p) {
+    const colors = el("div", { class: "group", style: "display:flex;gap:6px;align-items:center;margin:6px 0" }, el("label", { text: "Colour" }));
+    for (const c of COLORS) colors.append(el("div", { class: "sw tile " + c + (p.color === c ? " on" : ""), onclick: () => { p.color = c; commit(); renderTray(); } }));
+    const setAll = el("div", { class: "group", style: "display:flex;gap:6px;align-items:center;margin:6px 0" }, el("label", { text: "Point every hand" }));
+    const arrows = { up: "↑", right: "→", down: "↓", left: "←" };
+    for (const d of DIRS) setAll.append(el("button", { class: "tb", text: arrows[d], onclick: () => { p.dirs = p.cells.map(() => d); commit(); renderTray(); } }));
+    const big = el("div", { style: "margin:8px 0" });
+    const w = Math.max(...p.cells.map(c => c[0])) + 1, h = Math.max(...p.cells.map(c => c[1])) + 1;
+    const g = el("div", { class: "pgrid", style: "grid-template-columns: repeat(" + w + ", 56px); gap:3px" });
+    for (let y = h - 1; y >= 0; y--) for (let x = 0; x < w; x++) {
+      const i = p.cells.findIndex(c => c[0] === x && c[1] === y);
+      if (i < 0) { g.append(el("div", { style: "width:56px;height:56px" })); continue; }
+      const t = tileEl({ color: p.color, dir: p.dirs[i] }); t.style.cssText = "width:56px;height:56px;cursor:pointer"; t.title = "Click to turn";
+      t.addEventListener("click", () => { p.dirs[i] = DIRS[(DIRS.indexOf(p.dirs[i]) + 1) % 4]; commit(); renderTray(); });
+      g.append(t);
+    }
+    big.append(g);
+    const acts = el("div", { class: "row", style: "margin:6px 0 0" },
+      el("button", { class: "btn small danger", text: "Remove this piece", onclick: () => { b.splice(sel.slot, 1); sel = null; commit(); renderTray(); renderChecks(); } }),
+      el("button", { class: "btn small", text: "Done", onclick: () => { sel = null; renderTray(); } }));
+    ed.append(colors, setAll, big, acts,
+      el("div", { class: "note", text: "Tip: pieces are placed exactly as drawn (no rotating), so the hands point where you set them." }));
+  } else ed.append(el("button", { class: "btn small", text: "Cancel", onclick: () => { sel = null; renderTray(); } }));
+  card.append(ed);
+}
+
+function renderAll() { renderTop(); renderSteps(); renderEditor(); }
+
+// ------------------------------------------------------------------------------------------------------------------
+// Wiring.
+// ------------------------------------------------------------------------------------------------------------------
+$("bNew").onclick = () => { if (dirty && !confirm("Discard the changes to the current campaign?")) return; camp = newCampaign(); cur = 0; sel = null; fileName = ""; fileHandle = null; lastSnap = JSON.stringify(camp); undoStack = []; redoStack = []; dirty = false; renderAll(); };
+$("bOpen").onclick = () => { if (dirty && !confirm("Discard the changes to the current campaign?")) return; openFile(); };
+$("bSave").onclick = () => save(false);
+$("bSaveAs").onclick = () => save(true);
+$("bUndo").onclick = undo; $("bRedo").onclick = redo;
+$("kind").onchange = () => { camp.kind = $("kind").value; if (!camp.name || camp.name === "Arcade" || camp.name === "Tutorial") camp.name = camp.kind === "tutorial" ? "Tutorial" : "Arcade"; commit(); renderAll(); };
+$("cname").oninput = () => { camp.name = $("cname").value; commit("cname"); };
+$("finale").oninput = () => { camp.finale = $("finale").value; commit("finale"); };
+$("sAdd").onclick = () => { camp.steps.splice(cur + 1, 0, newStep("New " + stepLabel().toLowerCase())); cur++; sel = null; commit(); renderAll(); };
+$("sDup").onclick = () => { const c = clone(step()); c.title += " (copy)"; camp.steps.splice(cur + 1, 0, c); cur++; sel = null; commit(); renderAll(); };
+$("sUp").onclick = () => { if (cur > 0) { [camp.steps[cur - 1], camp.steps[cur]] = [camp.steps[cur], camp.steps[cur - 1]]; cur--; commit(); renderAll(); } };
+$("sDown").onclick = () => { if (cur < camp.steps.length - 1) { [camp.steps[cur + 1], camp.steps[cur]] = [camp.steps[cur], camp.steps[cur + 1]]; cur++; commit(); renderAll(); } };
+$("sDel").onclick = () => { if (camp.steps.length > 1 && confirm("Delete \"" + step().title + "\"?")) { camp.steps.splice(cur, 1); cur = Math.max(0, cur - 1); sel = null; commit(); renderAll(); } };
+window.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase(), inField = /^(input|textarea)$/i.test(document.activeElement.tagName);
+  if (k === "s") { e.preventDefault(); save(false); }
+  else if (!inField && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (!inField && k === "y") { e.preventDefault(); redo(); }
+});
+
+// Offer the last session's draft when the editor starts empty.
+(function init() {
+  renderAll();
+  try {
+    const d = JSON.parse(localStorage.getItem("pmCampaignDraft") || "null");
+    if (d && d.camp && d.camp.steps && JSON.stringify(d.camp) !== JSON.stringify(camp)) {
+      const b = el("button", { class: "btn", text: "Restore last session", onclick: () => { camp = normalise(d.camp); fileName = d.fileName || ""; cur = 0; lastSnap = JSON.stringify(camp); undoStack = []; redoStack = []; dirty = true; b.remove(); renderAll(); } });
+      $("status").before(b);
+    }
+  } catch (e) {}
+  // ?selftest: builds a campaign, saves it to text and reads it back; the verdict is written to the page for the test run.
+  if (location.search.includes("selftest")) {
+    const out = [];
+    try {
+      camp = newCampaign(); camp.steps[0].board.push({ x: 0, y: 0, color: "red", dir: "right" }, { x: 1, y: 0, bonus: "pumpkin" });
+      camp.steps[0].tray.buckets.push([newPiece(5, "purple"), newPiece(8, "ash")]); camp.steps.push(newStep("Second"));
+      camp.steps[0].holdSlot = false; camp.steps[0].goalBuckets = true; camp.steps[0].relics.reroll = true; camp.steps[0].relics.rerollCharges = 2; camp.steps[0].relics.holyLightCharges = 0;
+      camp.steps[0].tray.rerollBuckets.push([newPiece(11, "red")]); camp.steps[0].tray.rerollAfter = "loop";
+      const shapeKeys = SHAPES.map(sh => JSON.stringify(sh.cells.map(c => c.join(",")).sort()));
+      out.push("shapes " + SHAPES.length + (new Set(shapeKeys).size === SHAPES.length ? " distinct" : " DUPLICATE"));
+      const text = pretty(clean(camp)); const back = normalise(JSON.parse(text));
+      out.push("roundtrip " + (JSON.stringify(back) === JSON.stringify(clean(camp)) ? "OK" : "MISMATCH"));
+      out.push("steps " + back.steps.length + " bucket pieces " + back.steps[0].tray.buckets[0].length);
+      const b0 = back.steps[0]; out.push("hold " + b0.holdSlot + " goalBuckets " + b0.goalBuckets + " after " + b0.tray.after + " rerollCharges " + b0.relics.rerollCharges + " hl " + b0.relics.holyLightCharges + " rerollBuckets " + b0.tray.rerollBuckets.length + " " + b0.tray.rerollAfter);
+      document.title = "SELFTEST " + out.join("; ");
+    } catch (e) { document.title = "SELFTEST ERROR " + e.message; }
+    const verdict = document.title;
+    camp = newCampaign(); renderAll(); $("status").textContent = verdict;
+  }
+})();
+</script>
+</body>
+</html>

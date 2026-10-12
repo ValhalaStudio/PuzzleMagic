@@ -1,0 +1,143 @@
+{
+  "format": 1,
+  "kind": "arcade",
+  "name": "Arcade",
+  "finale": "You beat every challenge! Thanks for playing.",
+  "steps": [
+    {
+      "title": "First Steps",
+      "goal": 150,
+      "goalRoutes": 0,
+      "timeLimit": 0,
+      "grid": [
+        5,
+        5
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Welcome to the arcade! Build a chain of hands from one edge of the board to the other.",
+      "outro": "Nicely done. The next one has a clock.",
+      "hint": "",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    },
+    {
+      "title": "Against the Clock",
+      "goal": 300,
+      "goalRoutes": 0,
+      "timeLimit": 90,
+      "grid": [
+        6,
+        6
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Tick, tock. Reach the score before the time runs out.",
+      "outro": "Fast hands!",
+      "hint": "",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    },
+    {
+      "title": "Treats and Tricks",
+      "goal": 600,
+      "goalRoutes": 0,
+      "timeLimit": 120,
+      "grid": [
+        7,
+        7
+      ],
+      "relics": {
+        "holyLight": true,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": true,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "A Holy Light to clear the mess, and pumpkins to burst. Chain the hands into a pumpkin to pop it.",
+      "outro": "Sweet.",
+      "hint": "",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    },
+    {
+      "title": "The Potion Master",
+      "goal": 900,
+      "goalRoutes": 0,
+      "timeLimit": 150,
+      "grid": [
+        6,
+        6
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": true
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": true,
+        "emptyPotion": true
+      },
+      "intro": "Link the full potion to the empty one for a big payout.",
+      "outro": "Brewed to perfection.",
+      "hint": "",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    },
+    {
+      "title": "Witching Hour",
+      "goal": 1500,
+      "goalRoutes": 0,
+      "timeLimit": 180,
+      "grid": [
+        8,
+        8
+      ],
+      "relics": {
+        "holyLight": true,
+        "reroll": true
+      },
+      "bonus": {
+        "pumpkin": true,
+        "fullPotion": true,
+        "emptyPotion": true
+      },
+      "intro": "Everything is in play. Good luck.",
+      "outro": "Midnight strikes, and you are still standing.",
+      "hint": "",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    }
+  ]
+}

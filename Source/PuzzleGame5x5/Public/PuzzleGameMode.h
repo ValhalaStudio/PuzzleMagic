@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "PuzzleTypes.h"
+#include "CampaignData.h"
 #include "PuzzleGameMode.generated.h"
 
 class AGridManager;
@@ -31,7 +32,9 @@ class PUZZLEGAME5X5_API APuzzleGameMode : public AGameModeBase
 public:
 	APuzzleGameMode();
 
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void StartPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	TObjectPtr<AGridManager> GridManager;
@@ -73,6 +76,37 @@ public:
 	void SetCourse(int32 Width, int32 Height);
 	// The play options. Relics means combo, relics and luck together.
 	void SetOptions(bool bRelics, bool bBonusTiles);
+
+	// --- Campaigns: the arcade (challenges of escalating difficulty) and the tutorial (a step-by-step lesson), read from
+	// arcade.json and tutorial.json (see FArcadeCampaign). Kind 0 is the arcade, 1 the tutorial. A "challenge" below is a step. ---
+	bool HasCampaign(int32 Kind) const;
+	bool IsArcade() const { return bArcade; } // inside a campaign
+	int32 GetCampaignKind() const { return ActiveKind; }
+	EArcadeState GetArcadeState() const { return ArcadeState; }
+	const FArcadeChallenge* GetArcadeChallenge() const; // the step being played, null outside a campaign
+	int32 GetArcadeIndex() const { return ArcadeIndex; }
+	int32 GetArcadeCount() const;
+	int32 GetArcadeProgress() const; // steps beaten in a row, saved
+	float GetArcadeTimeLeft() const { return ArcadeTimeLeft; }
+	const FArcadeCampaign* GetArcadeCampaign() const { return Campaigns[ActiveKind].Get(); }
+	FString ArcadeFailReason;
+	// From the main menu: offers to continue, or goes straight to the first step when nothing is beaten yet.
+	void OpenCampaign(int32 Kind);
+	void StartArcade(int32 FromIndex);
+	void BeginArcadeChallenge(); // the START button of the intro popup: starts the clock
+	void ArcadeAdvance();        // the NEXT button of the outro popup
+	void ArcadeRetry();          // the RETRY button of the fail popup
+
+	// Console command for trying a step's popups without playing it: PuzzleArcadeTest win | fail | time (5 seconds left).
+	UFUNCTION(Exec)
+	void PuzzleArcadeTest(const FString& What);
+
+	// Test hook for the on-device interface sweep: shows one screen on demand. What is menu, courses, options, pause,
+	// gameover, game, howto (A = page), arcademenu (A = campaign 0 arcade / 1 tutorial), arcadeintro (A = campaign,
+	// B = step), arcadebegin, arcadewin, arcadefail, arcadetime, arcadedone (A = campaign). Nonce only makes each command text new, since the debug hook
+	// runs a command once per distinct text.
+	UFUNCTION(Exec)
+	void PuzzleUiCard(const FString& What, int32 A = 0, int32 B = 0, int32 Nonce = 0);
 
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	bool bPauseMenuOpen = false;
@@ -144,6 +178,33 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	float SfxVolume = 0.8f;
 
+	// The volume sliders. They apply at once and are saved.
+	void SetMusicVolume(float Volume);
+
+	// Options card. Graphics Low is the lightweight scene (reloads the map, which builds the scenery once); Fullscreen
+	// switches between a borderless full-screen window and an ordinary window (PC only).
+	bool IsLowGraphics() const;
+	void SetLowGraphics(bool bLow);
+	bool IsFullscreen() const;
+	int32 LastWindowMode = -1; // 1 fullscreen, 0 windowed; Tick watches it, since Alt+Enter and F11 change it too
+	void SetFullscreen(bool bFullscreen);
+
+	// Phones and tablets: the Landscape / Portrait choice of the options card (locks the screen that way).
+	bool IsPortrait() const;
+	void SetPortrait(bool bPortrait);
+	void ApplyOrientation() const;
+	void SetSfxVolume(float Volume);
+
+	// Console commands for measuring performance on a device (they work in any build with a console).
+	// PuzzleHide <backdrop|bats|steam|board|light|ui> <0|1>   hides (1) or shows (0) that part of the scene.
+	UFUNCTION(Exec)
+	void PuzzleHide(const FString& What, int32 Hide);
+
+	// PuzzlePerf <max fps, 0 = no cap> <3D resolution in percent, 0 = leave> <1 = automatic resolution, 0 = fixed>
+	// Sets the frame cap and the render resolution of the lightweight scene in one go, for power measurements.
+	UFUNCTION(Exec)
+	void PuzzlePerf(int32 MaxFps, int32 ResPercent, int32 Adaptive);
+
 	UPuzzleHUDWidget* GetUI() const;
 
 protected:
@@ -153,6 +214,19 @@ protected:
 	void HandleRelicGained(ERelic Relic);
 	void HandleBonusSpawned(FIntPoint Cell);
 	void HandleFinished();
+
+	void LoadCampaign();
+	void PrepareArcadeChallenge(bool bShowIntro);
+	void LeaveArcade();
+	void CheckArcadeWin();
+	void FailArcade(const FString& Reason);
+
+	TSharedPtr<FArcadeCampaign> Campaigns[2];
+	int32 ActiveKind = 0;
+	bool bArcade = false;
+	int32 ArcadeIndex = 0;
+	EArcadeState ArcadeState = EArcadeState::None;
+	float ArcadeTimeLeft = 0.f;
 
 	void ReframeCamera();
 	void PlayNextTrack();
@@ -173,6 +247,7 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<class UAudioComponent> MusicComponent;
+	float MusicGain = 1.f; // the playing track's own gain
 
 	UPROPERTY()
 	TObjectPtr<class AGothicEnvironment> Environment;

@@ -24,6 +24,9 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	// For measuring: the key light over the board on or off.
+	void SetBoardLightOn(bool bOn);
+
 	// Flips the wall/glass UVs if the plane's UV orientation doesn't match the window layout.
 	UPROPERTY(EditAnywhere, Category = "Gothic")
 	FVector2D WallUVFlip = FVector2D(0.f, 0.f);
@@ -73,6 +76,13 @@ private:
 		float LookTarget = 0.f;
 		float BlinkUntil = -1.f;
 	};
+
+	// The SFX slider's setting, relative to the volume the effects were tuned at.
+	float SfxScale() const;
+
+	// The lightweight (phone and tablet) set-up: just the key light over the board; the scenery is HalloweenProps' backdrop.
+	void BuildLite();
+	bool bLite = false;
 
 	void BuildEldritch();
 	// Returns the light multiplier (breathing x flicker) and how far flames turn eldritch green.

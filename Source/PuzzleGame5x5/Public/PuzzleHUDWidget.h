@@ -31,7 +31,12 @@ enum class EPuzzleCard : uint8
 	Tutorial,
 	Pause,
 	Courses,
-	Options
+	Options,
+	ArcadeMenu,   // continue or start over
+	ArcadeIntro,  // the popup before a challenge
+	ArcadeOutro,  // the popup after a challenge is won
+	ArcadeFail,
+	ArcadeDone    // after the last challenge
 };
 
 // Buttons never take keyboard focus, so game keys keep reaching the player controller after a click.
@@ -72,6 +77,8 @@ class PUZZLEGAME5X5_API UPuzzleHUDWidget : public UUserWidget
 
 public:
 	void ShowCard(EPuzzleCard Card);
+	// The window went fullscreen or windowed from outside the card (Alt+Enter): redraw the options card if it is up.
+	void OnWindowModeChanged();
 	void ShowClear(const FPuzzleClearEvent& Event);
 	void ShowComboBroken(int32 LostCombo);
 	void ShowRelicGained(ERelic Relic);
@@ -83,6 +90,16 @@ public:
 
 	void HandleAction(int32 Action, int32 Param);
 
+	// The volume sliders of the options card.
+	UFUNCTION()
+	void OnMusicVolumeChanged(float Value);
+
+	UFUNCTION()
+	void OnSfxVolumeChanged(float Value);
+
+	UFUNCTION()
+	void OnSfxVolumeReleased();
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -92,8 +109,10 @@ private:
 	enum EAction : int32
 	{
 		ActPlay, ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
-		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus,
-		ActCourse   // Param = width * 10 + height
+		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus, ActToggleGraphics, ActToggleScreen, ActToggleOrientation,
+		ActCourse,  // Param = width * 10 + height
+		ActExit,
+		ActArcade, ActArcadeStart, ActArcadeBegin, ActArcadeNext, ActArcadeRetry // ActArcadeStart's Param = challenge to start at
 	};
 
 	void BuildTutorialPage();
@@ -101,7 +120,8 @@ private:
 
 	// --- Builders ---
 	FSlateFontInfo Font(bool bTitle, float Size, float Outline = 4.f) const;
-	UTextBlock* MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline = 4.f);
+	// bFitWidth: a single line that comes from the campaign file shrinks to fit the card (titles always do).
+	UTextBlock* MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline = 4.f, bool bFitWidth = false);
 	UMaterialInstanceDynamic* MakePanelMID(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f, float Pressed = 0.f);
 	UImage* MakePanel(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f);
 	UImage* MakeIcon(float Shape, const FLinearColor& Color, float Size, float Fill = 1.f, float Glow = 0.f);

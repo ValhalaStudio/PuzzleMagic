@@ -27,3 +27,7 @@ __pycache__/
 
 # RunDemo.bat's screen capture lands in the project folder
 /DemoCapture.mp4
+
+# Running backup of the dev conversation (Tools/dev_chat_sync.py)
+dev_chat.log
+.dev_chat_state.json

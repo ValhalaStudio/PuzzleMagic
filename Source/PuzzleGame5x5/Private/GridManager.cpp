@@ -194,6 +194,10 @@ void AGridManager::BuildBoardVisuals()
 	ToonMesh::FBuffers TrayBodies, TrayHulls, ReserveHull;
 	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
 	{
+		if (SlotIndex == ReserveSlot && !bHoldEnabled)
+		{
+			continue;
+		}
 		FVector Offset = GetTrayAnchorWorldLocation(SlotIndex) - GetActorLocation();
 		Offset.Z = 0.f;
 		TrayBodies.Append(TrayBody, Offset);
@@ -1208,6 +1212,10 @@ int32 AGridManager::FindTraySlotAt(const FVector& WorldPoint) const
 
 bool AGridManager::IsOverReserve(const FVector& WorldPoint) const
 {
+	if (!bHoldEnabled)
+	{
+		return false;
+	}
 	const FVector Delta = WorldPoint - GetTrayAnchorWorldLocation(ReserveSlot);
 	return FMath::Abs(Delta.X) <= BoardLayout::TrayPanelHalf && FMath::Abs(Delta.Y) <= BoardLayout::TrayPanelHalf;
 }
@@ -1231,10 +1239,106 @@ void AGridManager::RefillTrayIfEmpty()
 		}
 	}
 
+	if (CuratedBuckets.Num() > 0)
+	{
+		if (NextBucket >= CuratedBuckets.Num() && CuratedAfter == ECampaignTrayAfter::Loop)
+		{
+			NextBucket = 0;
+		}
+		if (NextBucket < CuratedBuckets.Num())
+		{
+			// The next bucket: the slots beyond its pieces stay empty.
+			const TArray<FPuzzlePieceShape>& Bucket = CuratedBuckets[NextBucket++];
+			for (int32 SlotIndex = 0; SlotIndex < TraySize && SlotIndex < Bucket.Num(); ++SlotIndex)
+			{
+				Tray[SlotIndex] = Bucket[SlotIndex];
+				TraySlotUsed[SlotIndex] = false;
+			}
+			return;
+		}
+		if (CuratedAfter == ECampaignTrayAfter::End)
+		{
+			return; // out of pieces: the tray stays bare
+		}
+	}
+
 	for (int32 SlotIndex = 0; SlotIndex < TraySize; ++SlotIndex)
 	{
 		Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
 		TraySlotUsed[SlotIndex] = false;
+	}
+}
+
+void AGridManager::SetCuratedTray(const TArray<TArray<FPuzzlePieceShape>>& Buckets, ECampaignTrayAfter After, const TArray<TArray<FPuzzlePieceShape>>& RerollBuckets, ECampaignTrayAfter AfterReroll)
+{
+	CuratedBuckets = Buckets;
+	CuratedAfter = After;
+	NextBucket = 0;
+	CuratedRerollBuckets = RerollBuckets;
+	RerollAfter = AfterReroll;
+	NextRerollBucket = 0;
+}
+
+void AGridManager::ClearCuratedTray()
+{
+	CuratedBuckets.Reset();
+	CuratedAfter = ECampaignTrayAfter::Random;
+	NextBucket = 0;
+	CuratedRerollBuckets.Reset();
+	RerollAfter = ECampaignTrayAfter::Random;
+	NextRerollBucket = 0;
+}
+
+bool AGridManager::IsOutOfCuratedPieces() const
+{
+	if (CuratedBuckets.Num() == 0 || CuratedAfter != ECampaignTrayAfter::End || NextBucket < CuratedBuckets.Num())
+	{
+		return false;
+	}
+	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex) // the hold slot counts: a parked piece is still to be played
+	{
+		if (!TraySlotUsed[SlotIndex])
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void AGridManager::PlaceFixedTile(int32 X, int32 Y, EPuzzleTileColor Color, EPuzzleDir Dir)
+{
+	if (!IsValidCoord(X, Y) || Filled[Y * GridWidth + X])
+	{
+		return;
+	}
+	const int32 Index = Y * GridWidth + X;
+	Filled[Index] = true;
+	CellColors[Index] = Color;
+	CellDirs[Index] = Dir;
+	CellBonus[Index] = 0;
+	if (APuzzleTile* Tile = SpawnTile(GetWorldLocationForCell(X, Y), Color, Dir, 1.f))
+	{
+		Tile->MoveToPosition(X, Y);
+		CellVisuals[Index] = Tile;
+	}
+}
+
+void AGridManager::PlaceFixedBonus(int32 X, int32 Y, EPuzzleBonus Kind)
+{
+	if (!IsValidCoord(X, Y) || Filled[Y * GridWidth + X])
+	{
+		return;
+	}
+	const int32 Index = Y * GridWidth + X;
+	Filled[Index] = true;
+	CellColors[Index] = EPuzzleTileColor::Red;
+	CellDirs[Index] = EPuzzleDir::Up;
+	CellBonus[Index] = static_cast<uint8>(Kind);
+	if (APuzzleTile* Tile = SpawnTile(GetWorldLocationForCell(X, Y), EPuzzleTileColor::Red, EPuzzleDir::Up, 1.f))
+	{
+		Tile->SetBonus(Kind);
+		Tile->MoveToPosition(X, Y);
+		CellVisuals[Index] = Tile;
 	}
 }
 
@@ -1251,10 +1355,36 @@ void AGridManager::ConsumeTraySlot(int32 SlotIndex)
 void AGridManager::RerollTray()
 {
 	// A full refresh: all three tray slots get new pieces, however many were still unplayed (the hold slot is kept).
+	// A step with preset reroll buckets deals the next one in order; otherwise the pieces are random.
+	const TArray<FPuzzlePieceShape>* Preset = nullptr;
+	if (CuratedRerollBuckets.Num() > 0)
+	{
+		if (NextRerollBucket >= CuratedRerollBuckets.Num() && RerollAfter == ECampaignTrayAfter::Loop)
+		{
+			NextRerollBucket = 0;
+		}
+		if (NextRerollBucket < CuratedRerollBuckets.Num())
+		{
+			Preset = &CuratedRerollBuckets[NextRerollBucket++];
+		}
+	}
 	for (int32 SlotIndex = 0; SlotIndex < TraySize; ++SlotIndex)
 	{
-		Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
-		TraySlotUsed[SlotIndex] = false;
+		if (Preset)
+		{
+			// Slots beyond the bucket's pieces stay empty.
+			const bool bHasPiece = SlotIndex < Preset->Num();
+			if (bHasPiece)
+			{
+				Tray[SlotIndex] = (*Preset)[SlotIndex];
+			}
+			TraySlotUsed[SlotIndex] = !bHasPiece;
+		}
+		else
+		{
+			Tray[SlotIndex] = PieceLibrary::MakeRandomPieceRandomColor();
+			TraySlotUsed[SlotIndex] = false;
+		}
 	}
 	RefreshTrayVisuals();
 
@@ -1272,7 +1402,7 @@ void AGridManager::RerollTray()
 
 bool AGridManager::ParkPiece(int32 SlotIndex)
 {
-	if (SlotIndex < 0 || SlotIndex >= TraySize || TraySlotUsed[SlotIndex])
+	if (!bHoldEnabled || SlotIndex < 0 || SlotIndex >= TraySize || TraySlotUsed[SlotIndex])
 	{
 		return false;
 	}

@@ -65,6 +65,8 @@ public:
 	void SetGridSize(int32 Width, int32 Height);
 	static constexpr int32 TraySize = 3;      // regular slots 0..2
 	static constexpr int32 ReserveSlot = 3;   // the hold slot
+	// False takes the hold slot away (no panel, nothing can be parked). Set it before SetGridSize, which rebuilds the board visuals.
+	bool bHoldEnabled = true;
 	static constexpr int32 SlotCount = 4;
 
 	// How long a placed piece takes to fly from the tray into the board.
@@ -137,9 +139,30 @@ public:
 	UPROPERTY()
 	TArray<bool> TraySlotUsed;
 
+private:
+	TArray<TArray<FPuzzlePieceShape>> CuratedBuckets;
+	int32 NextBucket = 0;
+	ECampaignTrayAfter CuratedAfter = ECampaignTrayAfter::Random;
+	// The pieces each Reroll deals, in order (empty: random pieces); after the last one Loop starts over, otherwise random.
+	TArray<TArray<FPuzzlePieceShape>> CuratedRerollBuckets;
+	int32 NextRerollBucket = 0;
+	ECampaignTrayAfter RerollAfter = ECampaignTrayAfter::Random;
+public:
+
 	void RefillTrayIfEmpty();
 	void ConsumeTraySlot(int32 SlotIndex);
 	void RerollTray();
+
+	// Curated tray (campaign steps): the player is dealt these buckets of pieces in order instead of random ones. Call it
+	// before InitBoard. Empty buckets mean random pieces.
+	void SetCuratedTray(const TArray<TArray<FPuzzlePieceShape>>& Buckets, ECampaignTrayAfter After, const TArray<TArray<FPuzzlePieceShape>>& RerollBuckets = TArray<TArray<FPuzzlePieceShape>>(), ECampaignTrayAfter AfterReroll = ECampaignTrayAfter::Random);
+	void ClearCuratedTray();
+	// True when the curated pieces have all been dealt, the tray is bare and the tray does not start over.
+	bool IsOutOfCuratedPieces() const;
+
+	// Campaign boards: tiles that are on the board when a step starts (call after InitBoard).
+	void PlaceFixedTile(int32 X, int32 Y, EPuzzleTileColor Color, EPuzzleDir Dir);
+	void PlaceFixedBonus(int32 X, int32 Y, EPuzzleBonus Kind);
 
 	// Moves a regular tray piece into the reserve (swapping if the reserve is occupied).
 	bool ParkPiece(int32 SlotIndex);

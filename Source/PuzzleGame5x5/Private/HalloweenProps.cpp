@@ -1,4 +1,5 @@
 #include "HalloweenProps.h"
+#include "PuzzleLite.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -59,6 +60,13 @@ void AHalloweenProps::BeginPlay()
 	BatMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_BatSilhouette.M_BatSilhouette"));
 	FacingCamera = FRotationMatrix::MakeFromZX(TowardCamera, FVector(1.f, 0.f, 0.f)).Rotator();
 
+	bLite = PuzzleLite::IsLite();
+	if (bLite)
+	{
+		BuildLite();
+		return;
+	}
+	RestoreAfterLite();
 	BuildAll();
 }
 
@@ -228,6 +236,11 @@ void AHalloweenProps::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Time += DeltaTime;
+	if (bLite)
+	{
+		TickLite(DeltaTime);
+		return;
+	}
 	if (Time >= NextFitCheck)
 	{
 		NextFitCheck = Time + 0.5f;

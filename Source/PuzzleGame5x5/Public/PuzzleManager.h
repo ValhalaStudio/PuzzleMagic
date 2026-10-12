@@ -32,10 +32,29 @@ public:
 	bool bComboEnabled = false;
 	bool bRelicsEnabled = false;
 	bool bLuckEnabled = false;
-	void SetExtrasEnabled(bool bOn) { bComboEnabled = bOn; bRelicsEnabled = bOn; bLuckEnabled = bOn; }
+	void SetExtrasEnabled(bool bOn) { bComboEnabled = bOn; bRelicsEnabled = bOn; bLuckEnabled = bOn; bHolyLightEnabled = true; bRerollEnabled = true; StartHolyLightCharges = 1; StartRerollCharges = 1; }
+
+	// Charges of each relic the player starts a round with (a campaign step can preset them; the default is one of each).
+	int32 StartHolyLightCharges = 1;
+	int32 StartRerollCharges = 1;
+
+	// Which relics are in play while relics are on: the Play options switch both together, an arcade challenge picks one by one.
+	bool bHolyLightEnabled = true;
+	bool bRerollEnabled = true;
+	bool IsRelicEnabled(ERelic Relic) const { return bRelicsEnabled && (Relic == ERelic::HolyLight ? bHolyLightEnabled : bRerollEnabled); }
 
 	// Play option "Bonus tiles". Stored here; the bonus tiles themselves come in a later step.
 	bool bBonusTilesEnabled = false;
+
+	// Which bonus tiles drop while bonus tiles are on (the Play options switch all three together).
+	bool bPumpkinEnabled = true;
+	bool bOutgoingBottleEnabled = true;
+	bool bIncomingBottleEnabled = true;
+	void SetBonusTilesEnabled(bool bOn) { bBonusTilesEnabled = bOn; bPumpkinEnabled = bOn; bOutgoingBottleEnabled = bOn; bIncomingBottleEnabled = bOn; }
+
+	// An arcade challenge: relics and bonus tiles one by one. Either relic switches combos, relics and luck on
+	// (relics are earned through combos and paid for with luck); any bonus tile switches bonus tiles on.
+	void ConfigureItems(bool bHolyLight, bool bReroll, bool bPumpkin, bool bOutgoingBottle, bool bIncomingBottle, int32 HolyLightCharges = 1, int32 RerollCharges = 1);
 
 	// A combo breaks after this many placements in a row without a clear (so it survives one fewer).
 	static constexpr int32 ComboWindowMoves = 3;
@@ -96,6 +115,8 @@ public:
 	int32 GetLuck() const { return Luck; }
 	int32 Score = 0;
 	int32 ComboStreak = 0;
+	// Routes cleared since the round began (a campaign step can ask for a number of them).
+	int32 RoutesCleared = 0;
 	// Placements left before the combo breaks (shown as pips).
 	int32 ComboWindow = 0;
 	int32 LastRoundScore = 0;

@@ -6,9 +6,26 @@ void UPuzzleManager::BindToGrid(AGridManager* InGridManager)
 	GridManager = InGridManager;
 }
 
+void UPuzzleManager::ConfigureItems(bool bHolyLight, bool bReroll, bool bPumpkin, bool bOutgoingBottle, bool bIncomingBottle, int32 HolyLightCharges, int32 RerollCharges)
+{
+	StartHolyLightCharges = FMath::Clamp(HolyLightCharges, 0, MaxRelicCharges);
+	StartRerollCharges = FMath::Clamp(RerollCharges, 0, MaxRelicCharges);
+	const bool bAnyRelic = bHolyLight || bReroll;
+	bComboEnabled = bAnyRelic;
+	bRelicsEnabled = bAnyRelic;
+	bLuckEnabled = bAnyRelic;
+	bHolyLightEnabled = bHolyLight;
+	bRerollEnabled = bReroll;
+	bPumpkinEnabled = bPumpkin;
+	bOutgoingBottleEnabled = bOutgoingBottle;
+	bIncomingBottleEnabled = bIncomingBottle;
+	bBonusTilesEnabled = bPumpkin || bOutgoingBottle || bIncomingBottle;
+}
+
 void UPuzzleManager::StartGame()
 {
 	Score = 0;
+	RoutesCleared = 0;
 	ComboStreak = 0;
 	ComboWindow = 0;
 	LastRoundScore = 0;
@@ -16,9 +33,9 @@ void UPuzzleManager::StartGame()
 	MovesLeft = StartingMoves;
 	MovesMade = 0;
 	LastBonusMoves = 0;
-	// One of each to start, so the relic buttons are learnable from the first move.
-	RelicCharges[0] = bRelicsEnabled ? 1 : 0;
-	RelicCharges[1] = bRelicsEnabled ? 1 : 0;
+	// One of each to start by default, so the relic buttons are learnable from the first move.
+	RelicCharges[0] = IsRelicEnabled(ERelic::HolyLight) ? StartHolyLightCharges : 0;
+	RelicCharges[1] = IsRelicEnabled(ERelic::Reroll) ? StartRerollCharges : 0;
 	NextRelicCombo = RelicComboStep;
 	NextRelic = ERelic::HolyLight;
 	bFinished = false;
@@ -54,6 +71,7 @@ bool UPuzzleManager::TryPlacePiece(int32 TraySlot, int32 OriginX, int32 OriginY)
 	// Placing a piece scores nothing; only clears do.
 	int32 RoundScore = 0;
 	LastBonusMoves = 0;
+	RoutesCleared += Result.Lines;
 	if (Result.Lines > 0)
 	{
 		// Multi-line clears push the combo up faster; any clear refills the window.
@@ -223,7 +241,7 @@ void UPuzzleManager::SpawnDueBonusTiles()
 	if (Score >= NextBasicBonusScore)
 	{
 		NextBasicBonusScore = (Score / BasicBonusEvery + 1) * BasicBonusEvery;
-		if (GridManager->CountBonusTiles(EPuzzleBonus::Basic) < MaxBasicBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Basic, Cell))
+		if (bPumpkinEnabled && GridManager->CountBonusTiles(EPuzzleBonus::Basic) < MaxBasicBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Basic, Cell))
 		{
 			OnBonusSpawned.Broadcast(Cell);
 		}
@@ -231,11 +249,11 @@ void UPuzzleManager::SpawnDueBonusTiles()
 	if (Score >= NextPairBonusScore)
 	{
 		NextPairBonusScore = (Score / PairBonusEvery + 1) * PairBonusEvery;
-		if (GridManager->CountBonusTiles(EPuzzleBonus::Outgoing) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Outgoing, Cell))
+		if (bOutgoingBottleEnabled && GridManager->CountBonusTiles(EPuzzleBonus::Outgoing) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Outgoing, Cell))
 		{
 			OnBonusSpawned.Broadcast(Cell);
 		}
-		if (GridManager->CountBonusTiles(EPuzzleBonus::Incoming) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Incoming, Cell))
+		if (bIncomingBottleEnabled && GridManager->CountBonusTiles(EPuzzleBonus::Incoming) < MaxDirectionalBonusTiles && GridManager->SpawnBonusTile(EPuzzleBonus::Incoming, Cell))
 		{
 			OnBonusSpawned.Broadcast(Cell);
 		}
@@ -255,13 +273,20 @@ void UPuzzleManager::GrantRelics()
 	while (ComboStreak >= NextRelicCombo)
 	{
 		NextRelicCombo += RelicComboStep;
-		int32& Charges = RelicCharges[static_cast<int32>(NextRelic)];
+		const ERelic Other = NextRelic == ERelic::HolyLight ? ERelic::Reroll : ERelic::HolyLight;
+		// A relic that is not in play is skipped in favour of the other one.
+		const ERelic Which = IsRelicEnabled(NextRelic) ? NextRelic : Other;
+		NextRelic = Other;
+		if (!IsRelicEnabled(Which))
+		{
+			continue;
+		}
+		int32& Charges = RelicCharges[static_cast<int32>(Which)];
 		if (Charges < MaxRelicCharges)
 		{
 			++Charges;
-			OnRelicGained.Broadcast(NextRelic);
+			OnRelicGained.Broadcast(Which);
 		}
-		NextRelic = NextRelic == ERelic::HolyLight ? ERelic::Reroll : ERelic::HolyLight;
 	}
 }
 
@@ -290,6 +315,11 @@ bool UPuzzleManager::IsGameOver() const
 		return false;
 	}
 	if (IsOutOfMoves())
+	{
+		return true;
+	}
+	// The campaign's fixed pieces are all used: nothing is left to play, whatever relics remain.
+	if (GridManager->IsOutOfCuratedPieces())
 	{
 		return true;
 	}

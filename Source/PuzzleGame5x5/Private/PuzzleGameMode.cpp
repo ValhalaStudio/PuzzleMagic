@@ -7,10 +7,15 @@
 #include "PuzzleHUD.h"
 #include "PuzzleHUDWidget.h"
 #include "PuzzleFX.h"
+#include "PuzzleTile.h"
 #include "PuzzleSaveGame.h"
 #include "GothicEnvironment.h"
 #include "HalloweenProps.h"
+#include "PuzzleLite.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/GameUserSettings.h"
+#include "Engine/GameViewportClient.h"
+#include "Widgets/SWindow.h"
 #include "GameFramework/PlayerController.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -19,9 +24,16 @@
 #include "Misc/Paths.h"
 #include "Components/AudioComponent.h"
 #include "AudioMixerBlueprintLibrary.h"
+#include "EngineUtils.h"
+#include "Components/PrimitiveComponent.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
+#include "MaterialShared.h"
+#include "TimerManager.h"
 
 APuzzleGameMode::APuzzleGameMode()
 {
+	PrimaryActorTick.bCanEverTick = true; // the arcade clock
 	GridManagerClass = AGridManager::StaticClass();
 	InputHandlerClass = APuzzleInputHandler::StaticClass();
 	DefaultPawnClass = APuzzleCameraPawn::StaticClass();
@@ -64,12 +76,117 @@ void APuzzleGameMode::StartAudioRecording(float Seconds)
 	}), Seconds, false);
 }
 
+void APuzzleGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	// Before the camera pawn and the scenery are made: they choose their effects by this.
+	if (UPuzzleSaveGame* Early = UPuzzleSaveGame::LoadOrCreate())
+	{
+		PuzzleLite::SetLowGraphics(Early->bLowGraphics && !PuzzleLite::IsMobile());
+	}
+}
+
+bool APuzzleGameMode::IsLowGraphics() const
+{
+	return PuzzleLite::IsLite();
+}
+
+void APuzzleGameMode::SetLowGraphics(bool bLow)
+{
+	if (PuzzleLite::IsMobile() || !SaveGame || SaveGame->bLowGraphics == bLow)
+	{
+		return;
+	}
+	SaveGame->bLowGraphics = bLow;
+	SaveGame->Save();
+	PuzzleLite::SetLowGraphics(bLow);
+	// The scenery is built once when the map starts, so the map is loaded again to build it in the new mode.
+	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
+}
+
+bool APuzzleGameMode::IsFullscreen() const
+{
+	// The mode the window is really in (the saved setting can differ, e.g. when the game was started with -windowed).
+	if (GEngine && GEngine->GameViewport)
+	{
+		if (const TSharedPtr<SWindow> Window = GEngine->GameViewport->GetWindow())
+		{
+			return Window->GetWindowMode() != EWindowMode::Windowed;
+		}
+	}
+	return true;
+}
+
+void APuzzleGameMode::SetFullscreen(bool bFullscreen)
+{
+#if !(PLATFORM_ANDROID || PLATFORM_IOS)
+	UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr;
+	if (!Settings)
+	{
+		return;
+	}
+	const FIntPoint Desktop = Settings->GetDesktopResolution();
+	FIntPoint Size = Desktop;
+	if (!bFullscreen)
+	{
+		// A 16:9 window that fits the desktop with room for the title bar.
+		const int32 Width = FMath::Clamp(FMath::RoundToInt(Desktop.X * 0.8f), 960, 1600);
+		Size = FIntPoint(Width, Width * 9 / 16);
+	}
+	Settings->SetFullscreenMode(bFullscreen ? EWindowMode::WindowedFullscreen : EWindowMode::Windowed);
+	Settings->SetScreenResolution(Size);
+	Settings->ApplySettings(false);
+	// Also asks the window itself, which is what changes the mode when the game was started with -windowed.
+	Settings->RequestResolutionChange(Size.X, Size.Y, bFullscreen ? EWindowMode::WindowedFullscreen : EWindowMode::Windowed, false);
+	if (SaveGame)
+	{
+		SaveGame->DisplayMode = bFullscreen ? 1 : 0;
+		SaveGame->Save();
+	}
+#endif
+}
+
+bool APuzzleGameMode::IsPortrait() const
+{
+	return SaveGame && SaveGame->bPortrait;
+}
+
+void APuzzleGameMode::ApplyOrientation() const
+{
+	// Only does something on a phone or tablet. The sensor variants let the screen flip between the two ways up.
+	FPlatformMisc::SetAllowedDeviceOrientation(IsPortrait() ? EDeviceScreenOrientation::PortraitSensor : EDeviceScreenOrientation::LandscapeSensor);
+}
+
+void APuzzleGameMode::SetPortrait(bool bPortrait)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+	SaveGame->bPortrait = bPortrait;
+	SaveGame->Save();
+	ApplyOrientation();
+}
+
 void APuzzleGameMode::StartPlay()
 {
 	Super::StartPlay();
 
 	SaveGame = UPuzzleSaveGame::LoadOrCreate();
+	if (SaveGame)
+	{
+		MusicVolume = SaveGame->MusicVolume;
+		SfxVolume = SaveGame->SfxVolume;
+#if PLATFORM_ANDROID || PLATFORM_IOS
+		ApplyOrientation();
+#endif
+		if (SaveGame->DisplayMode >= 0 && !PuzzleLite::IsMobile() && IsFullscreen() != (SaveGame->DisplayMode == 1))
+		{
+			SetFullscreen(SaveGame->DisplayMode == 1);
+		}
+	}
 	PuzzleManager = NewObject<UPuzzleManager>(this);
+	LoadCampaign();
 
 	if (GetWorld())
 	{
@@ -92,7 +209,7 @@ void APuzzleGameMode::StartPlay()
 	if (SaveGame)
 	{
 		PuzzleManager->SetExtrasEnabled(SaveGame->bOptionRelics);
-		PuzzleManager->bBonusTilesEnabled = SaveGame->bOptionBonusTiles;
+		PuzzleManager->SetBonusTilesEnabled(SaveGame->bOptionBonusTiles);
 	}
 
 	if (InputHandler)
@@ -123,6 +240,72 @@ void APuzzleGameMode::StartPlay()
 	}
 
 	ReframeCamera();
+	// -backdropcapture: renders the picture the lightweight mode uses as its background. Run on a PC with
+	// -demo -grid=8x8 -resx=1280 -resy=720; after ten seconds the board, tiles, interface and sprites are hidden,
+	// a 1920x1080 shot is taken (Saved/Screenshots) and the game quits.
+	if (FParse::Param(FCommandLine::Get(), TEXT("backdropcapture")))
+	{
+		FTimerHandle HideHandle;
+		GetWorldTimerManager().SetTimer(HideHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			{
+				if (It->IsA<AGridManager>() || It->IsA<APuzzleTile>() || It->IsA<APuzzleFX>())
+				{
+					It->SetActorHiddenInGame(true);
+				}
+				else if (AHalloweenProps* Props = Cast<AHalloweenProps>(*It))
+				{
+					Props->SetCaptureMode();
+				}
+			}
+			if (UPuzzleHUDWidget* UI = GetUI())
+			{
+				UI->SetVisibility(ESlateVisibility::Collapsed);
+			}
+		}), 10.f, false);
+		FTimerHandle ShotHandle;
+		GetWorldTimerManager().SetTimer(ShotHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+			{
+				PC->ConsoleCommand(TEXT("HighResShot 1920x1080"));
+			}
+		}), 13.f, false);
+		FTimerHandle QuitHandle;
+		GetWorldTimerManager().SetTimer(QuitHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+			{
+				PC->ConsoleCommand(TEXT("quit"));
+			}
+		}), 18.f, false);
+	}
+
+#if PLATFORM_ANDROID && !UE_BUILD_SHIPPING
+	// Test builds on Android run whatever console command is in the system property debug.puzzle.exec
+	// (`adb shell setprop debug.puzzle.exec "r.ScreenPercentage 50"`), so frame-rate experiments need no rebuild.
+	{
+		FTimerHandle ExecHandle;
+		GetWorldTimerManager().SetTimer(ExecHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			static FString LastCommand;
+			char Value[PROP_VALUE_MAX] = {};
+			if (__system_property_get("debug.puzzle.exec", Value) > 0)
+			{
+				const FString Command = UTF8_TO_TCHAR(Value);
+				if (Command != LastCommand)
+				{
+					LastCommand = Command;
+					if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+					{
+						PC->ConsoleCommand(Command);
+					}
+				}
+			}
+		}), 1.f, true);
+	}
+#endif
 
 	PlayNextTrack();
 
@@ -200,6 +383,72 @@ void APuzzleGameMode::PlaySfx(USoundBase* Sound, float Volume, float Pitch) cons
 	}
 }
 
+void APuzzleGameMode::PuzzlePerf(int32 MaxFps, int32 ResPercent, int32 Adaptive)
+{
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		PC->ConsoleCommand(FString::Printf(TEXT("t.MaxFPS %d"), FMath::Max(MaxFps, 0)));
+	}
+	for (TActorIterator<AHalloweenProps> It(GetWorld()); It; ++It)
+	{
+		It->SetPerfOverride(Adaptive != 0, ResPercent > 0 ? ResPercent / 100.f : 0.f);
+	}
+}
+
+void APuzzleGameMode::PuzzleHide(const FString& What, int32 Hide)
+{
+	const bool bHide = Hide != 0;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (What == TEXT("board") && (It->IsA<AGridManager>() || It->IsA<APuzzleTile>()))
+		{
+			It->SetActorHiddenInGame(bHide);
+		}
+		else if (AHalloweenProps* Props = Cast<AHalloweenProps>(*It))
+		{
+			Props->SetLiteLayerHidden(What, bHide);
+		}
+		else if (What == TEXT("light"))
+		{
+			if (AGothicEnvironment* Env = Cast<AGothicEnvironment>(*It))
+			{
+				Env->SetBoardLightOn(!bHide);
+			}
+		}
+	}
+	if (What == TEXT("ui"))
+	{
+		if (UPuzzleHUDWidget* UI = GetUI())
+		{
+			UI->SetVisibility(bHide ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+		}
+	}
+}
+
+void APuzzleGameMode::SetMusicVolume(float Volume)
+{
+	MusicVolume = FMath::Clamp(Volume, 0.f, 1.f);
+	if (MusicComponent)
+	{
+		MusicComponent->SetVolumeMultiplier(MusicVolume * MusicGain);
+	}
+	if (SaveGame)
+	{
+		SaveGame->MusicVolume = MusicVolume;
+		SaveGame->Save();
+	}
+}
+
+void APuzzleGameMode::SetSfxVolume(float Volume)
+{
+	SfxVolume = FMath::Clamp(Volume, 0.f, 1.f);
+	if (SaveGame)
+	{
+		SaveGame->SfxVolume = SfxVolume;
+		SaveGame->Save();
+	}
+}
+
 void APuzzleGameMode::PlayNextTrack()
 {
 	// Loop lengths of the synthesized tracks (their wave assets loop, so the engine reports no duration).
@@ -218,6 +467,7 @@ void APuzzleGameMode::PlayNextTrack()
 	{
 		MusicComponent->FadeOut(Crossfade, 0.f);
 	}
+	MusicGain = Track.Gain;
 	const float Volume = MusicVolume * Track.Gain;
 	MusicComponent = UGameplayStatics::SpawnSound2D(this, Track.Sound, Volume, 1.f, 0.f, nullptr, true, true);
 	if (MusicComponent && MusicTrackIndex > 1)
@@ -265,6 +515,7 @@ void APuzzleGameMode::StartRound()
 
 void APuzzleGameMode::ShowMenu()
 {
+	LeaveArcade();
 	for (FTimerHandle& Handle : RoundTimers)
 	{
 		GetWorldTimerManager().ClearTimer(Handle);
@@ -371,7 +622,7 @@ void APuzzleGameMode::SetOptions(bool bRelics, bool bBonusTiles)
 	if (PuzzleManager)
 	{
 		PuzzleManager->SetExtrasEnabled(bRelics);
-		PuzzleManager->bBonusTilesEnabled = bBonusTiles;
+		PuzzleManager->SetBonusTilesEnabled(bBonusTiles);
 	}
 	if (SaveGame)
 	{
@@ -422,6 +673,7 @@ void APuzzleGameMode::HandlePiecePlaced()
 
 void APuzzleGameMode::HandleCleared(const FPuzzleClearEvent& Event)
 {
+	CheckArcadeWin();
 	const float Delay = Event.bHolyLight ? 0.1f : AGridManager::ArriveDuration + 0.1f;
 	Later(Delay, [this, Event]()
 	{
@@ -493,6 +745,12 @@ void APuzzleGameMode::HandleBonusSpawned(FIntPoint Cell)
 
 void APuzzleGameMode::HandleFinished()
 {
+	// Using up the last preset piece ends the round: that is a win when the step's other goals are met.
+	CheckArcadeWin();
+	if (bArcade && ArcadeState != EArcadeState::Playing)
+	{
+		return; // already won or failed
+	}
 	bGameOver = true;
 	Flow = EPuzzleFlow::Finished;
 	if (InputHandler)
@@ -502,7 +760,7 @@ void APuzzleGameMode::HandleFinished()
 
 	bLastNewBest = false;
 	// The demo bot's results never touch the player's progress.
-	if (SaveGame && !bAutoPlayEnabled && PuzzleManager && PuzzleManager->Score > SaveGame->BestScore)
+	if (SaveGame && !bArcade && !bAutoPlayEnabled && PuzzleManager && PuzzleManager->Score > SaveGame->BestScore)
 	{
 		SaveGame->BestScore = PuzzleManager->Score;
 		bLastNewBest = true;
@@ -518,6 +776,24 @@ void APuzzleGameMode::HandleFinished()
 			GridManager->CollapseBoard();
 		}
 	});
+
+	if (bArcade)
+	{
+		ArcadeState = EArcadeState::Failed;
+		ArcadeFailReason = (GridManager && GridManager->IsOutOfCuratedPieces()) ? TEXT("Out of pieces!") : TEXT("No room left!");
+		Later(2.0f, [this]()
+		{
+			if (bArcade && ArcadeState == EArcadeState::Failed)
+			{
+				Flow = EPuzzleFlow::Menu;
+				if (UPuzzleHUDWidget* UI = GetUI())
+				{
+					UI->ShowCard(EPuzzleCard::ArcadeFail);
+				}
+			}
+		});
+		return;
+	}
 
 	Later(2.0f, [this]()
 	{

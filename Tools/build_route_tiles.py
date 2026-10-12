@@ -98,10 +98,11 @@ tile_code = swap(tile_code, """        if (InSymbol > -0.5)
             float hfill = 1.0 - smoothstep(-haa, haa, hd);
             float hedge = (1.0 - smoothstep(0.018 - haa, 0.018 + haa, abs(hd))) * hfill;
             float hline = (1.0 - smoothstep(0.012 - haa, 0.012 + haa, handDetail / 0.72)) * hfill;
-            float dark = InSymbol > 2.5 ? 1.0 : 0.0;
-            float3 bone = lerp(float3(0.93, 0.89, 0.76), float3(0.02, 0.02, 0.025), dark);
+            // White hands on the purple (1) and ash (3) tiles, bone-coloured ones on black (0) and red (2).
+            float whiteHand = ((InSymbol > 0.5 && InSymbol < 1.5) || InSymbol > 2.5) ? 1.0 : 0.0;
+            float3 bone = lerp(float3(0.93, 0.89, 0.76), float3(1.0, 1.0, 1.0), whiteHand);
             base = lerp(base, bone, hfill);
-            base = lerp(base, lerp(bone * 0.35, float3(0.6, 0.6, 0.65), dark), max(hedge, hline * 0.8));
+            base = lerp(base, bone * 0.35, max(hedge, hline * 0.8));
             metal = 0.0;
             rough = lerp(rough, 0.5, hfill);
             emis += bone * 0.12 * hfill;

@@ -24,7 +24,8 @@ public class PuzzleGame5x5 : ModuleRules
 			"RealtimeMeshComponent",
 			"MeshOptimizer",
 			"AudioMixer",
-			"Synthesis"
+			"Synthesis",
+			"Json"
 		});
 
 		// FastNoise2 is prebuilt for Win64 only (an iOS build of it needs a Mac); elsewhere the

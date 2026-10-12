@@ -31,6 +31,8 @@ void APuzzleInputHandler::BeginPlay()
 		InputMode.SetHideCursorDuringCapture(false);
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		PC->SetInputMode(InputMode);
+		// The game draws its own touch UI: remove the engine's default on-screen joysticks.
+		PC->ActivateTouchInterface(nullptr);
 
 		EnableInput(PC);
 		if (InputComponent)

@@ -16,18 +16,27 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/ScaleBox.h"
+#include "Components/Slider.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Fonts/CompositeFont.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/Paths.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 namespace UIStyle
 {
+	// Width the long body text on the cards wraps to: the frame lines are 830 units apart and wrapped text draws about 15% wider than its box.
+	constexpr float BodyWrapWidth = 640.f;
 	// Linear colours (Slate converts to sRGB on output).
 	const FLinearColor Ink(0.02f, 0.008f, 0.04f);
 	const FLinearColor Gold(1.f, 0.55f, 0.08f);
@@ -90,8 +99,19 @@ FSlateFontInfo UPuzzleHUDWidget::Font(bool bTitle, float Size, float Outline) co
 	return FSlateFontInfo(bTitle ? TitleFont : BodyFont, Size, NAME_None, OutlineSettings);
 }
 
-UTextBlock* UPuzzleHUDWidget::MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline)
+UTextBlock* UPuzzleHUDWidget::MakeText(const FString& Text, bool bTitle, float Size, const FLinearColor& Color, float Outline, bool bFitWidth)
 {
+	// Titles shrink to fit between the card's frame lines. The wide decorative face is drawn a little wider than it is
+	// measured (about 25% wider on a phone), so the limit leaves room (a card's frame lines are 830 units apart).
+	if ((bTitle || bFitWidth) && FSlateApplication::IsInitialized() && FSlateApplication::Get().GetRenderer())
+	{
+		constexpr float MaxTitleWidth = 560.f;
+		const float Width = static_cast<float>(FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text, Font(true, Size, Outline)).X);
+		if (Width > MaxTitleWidth)
+		{
+			Size *= MaxTitleWidth / Width;
+		}
+	}
 	UTextBlock* Block = WidgetTree->ConstructWidget<UTextBlock>();
 	Block->SetText(FText::FromString(Text));
 	Block->SetFont(Font(bTitle, Size, Outline));
@@ -515,6 +535,14 @@ void UPuzzleHUDWidget::ShowCard(EPuzzleCard Card)
 	CardLayer->SetVisibility(ESlateVisibility::Visible);
 }
 
+void UPuzzleHUDWidget::OnWindowModeChanged()
+{
+	if (CurrentCard == EPuzzleCard::Options)
+	{
+		RefreshCard();
+	}
+}
+
 void UPuzzleHUDWidget::RefreshCard()
 {
 	if (CurrentCard != EPuzzleCard::None)
@@ -568,10 +596,22 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Add(MakeText(FString::Printf(TEXT("course  %dx%d"), Board ? Board->GridWidth : 8, Board ? Board->GridHeight : 8), false, 30.f, Cyan, 3.f), 6.f);
 		const int32 Best = Save ? Save->BestScore : 0;
 		Add(MakeText(Best > 0 ? FString::Printf(TEXT("best  %d"), Best) : TEXT("no best yet"), false, 30.f, PaleGold, 3.f), 2.f);
-		Add(Btn(TEXT("SELECT COURSE"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActCourses), 22.f);
+		float NextTop = 22.f;
+		if (GameMode && GameMode->HasCampaign(0))
+		{
+			Add(Btn(TEXT("ARCADE"), FVector2D(520.f, 100.f), Emerald, Emerald2, ActArcade, 0), NextTop);
+			NextTop = 14.f;
+		}
+		if (GameMode && GameMode->HasCampaign(1))
+		{
+			Add(Btn(TEXT("TUTORIAL"), FVector2D(520.f, 100.f), Emerald, Emerald2, ActArcade, 1), NextTop);
+			NextTop = 14.f;
+		}
+		Add(Btn(TEXT("SELECT COURSE"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActCourses), NextTop);
 		Add(Btn(TEXT("PLAY OPTIONS"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActOptions), 14.f);
 		Add(Btn(TEXT("DEMO"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActStartDemo), 14.f);
 		Add(Btn(TEXT("HOW TO PLAY"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActHowTo), 14.f);
+		Add(Btn(TEXT("EXIT"), FVector2D(520.f, 100.f), Ruby, Ruby2, ActExit), 14.f);
 		break;
 	}
 	case EPuzzleCard::Pause:
@@ -623,7 +663,191 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		Add(MakeText(TEXT("combos, relics and luck"), false, 28.f, Lavender, 3.f), 6.f);
 		Add(Btn(FString::Printf(TEXT("BONUS TILES  %s"), bBonus ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bBonus ? Emerald : Ruby, bBonus ? Emerald2 : Ruby2, ActToggleBonus), 30.f);
 		Add(MakeText(TEXT("special tiles worth extra points"), false, 28.f, Lavender, 3.f), 6.f);
-		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 44.f);
+		// Graphics (a PC; a phone or tablet is always Low) and the window mode (PC only), side by side to keep the card short.
+		{
+			const bool bLow = GameMode && GameMode->IsLowGraphics();
+			const bool bFull = GameMode && GameMode->IsFullscreen();
+			UWidget* GraphicsButton = Btn(FString::Printf(TEXT("GRAPHICS %s"), bLow ? TEXT("LOW") : TEXT("HIGH")), FVector2D(316.f, 80.f), bLow ? Ruby : Emerald, bLow ? Ruby2 : Emerald2, ActToggleGraphics);
+			UWidget* ScreenButton = Btn(bFull ? TEXT("FULLSCREEN") : TEXT("WINDOWED"), FVector2D(316.f, 80.f), bFull ? Emerald : Amethyst, bFull ? Emerald2 : Amethyst2, ActToggleScreen);
+#if PLATFORM_IOS || PLATFORM_ANDROID
+			const bool bPortraitNow = GameMode && GameMode->IsPortrait();
+			Add(Btn(bPortraitNow ? TEXT("PORTRAIT") : TEXT("LANDSCAPE"), FVector2D(400.f, 84.f), Amethyst, Amethyst2, ActToggleOrientation), 28.f);
+			Add(MakeText(TEXT("graphics are always low on this device"), false, 24.f, Lavender, 3.f), 4.f);
+			(void)GraphicsButton; (void)ScreenButton;
+#else
+			Add(ButtonRow(GraphicsButton, ScreenButton), 28.f);
+#endif
+		}
+		auto VolumeSlider = [this](float Value, bool bMusic) -> UWidget*
+		{
+			USlider* Slider = WidgetTree->ConstructWidget<USlider>();
+			Slider->SetValue(Value);
+			Slider->SetStepSize(0.01f);
+			// A fat bar and a big gold knob: easy to grab with a thumb.
+			const FSlateRoundedBoxBrush Bar(FLinearColor(0.34f, 0.2f, 0.62f), 10.f, FVector2f(64.f, 20.f));
+			const FSlateRoundedBoxBrush BarLit(FLinearColor(0.45f, 0.28f, 0.78f), 10.f, FVector2f(64.f, 20.f));
+			const FSlateRoundedBoxBrush Knob(Gold, 23.f, FVector2f(46.f, 46.f));
+			const FSlateRoundedBoxBrush KnobLit(PaleGold, 25.f, FVector2f(50.f, 50.f));
+			Slider->SetSliderBarColor(FLinearColor::White);
+			Slider->SetSliderHandleColor(FLinearColor::White);
+			FSliderStyle Style = Slider->GetWidgetStyle();
+			Style.SetBarThickness(20.f);
+			Style.SetNormalBarImage(Bar);
+			Style.SetHoveredBarImage(BarLit);
+			Style.SetDisabledBarImage(Bar);
+			Style.SetNormalThumbImage(Knob);
+			Style.SetHoveredThumbImage(KnobLit);
+			Style.SetDisabledThumbImage(Knob);
+			Slider->SetWidgetStyle(Style);
+			if (bMusic)
+			{
+				Slider->OnValueChanged.AddDynamic(this, &UPuzzleHUDWidget::OnMusicVolumeChanged);
+			}
+			else
+			{
+				Slider->OnValueChanged.AddDynamic(this, &UPuzzleHUDWidget::OnSfxVolumeChanged);
+				Slider->OnMouseCaptureEnd.AddDynamic(this, &UPuzzleHUDWidget::OnSfxVolumeReleased);
+			}
+			return Sized(Slider, FVector2D(520.f, 64.f));
+		};
+		Add(MakeText(TEXT("MUSIC"), true, 40.f, PaleGold, 4.f), 34.f);
+		Add(VolumeSlider(GameMode ? GameMode->MusicVolume : 0.7f, true), 6.f);
+		Add(MakeText(TEXT("SOUND EFFECTS"), true, 40.f, PaleGold, 4.f), 18.f);
+		Add(VolumeSlider(GameMode ? GameMode->SfxVolume : 0.8f, false), 6.f);
+		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 40.f);
+		break;
+	}
+	case EPuzzleCard::ArcadeMenu:
+	{
+		const int32 Progress = GameMode ? GameMode->GetArcadeProgress() : 0;
+		const int32 Count = GameMode ? GameMode->GetArcadeCount() : 0;
+		const FArcadeCampaign* Camp = GameMode ? GameMode->GetArcadeCampaign() : nullptr;
+		const bool bTutorial = GameMode && GameMode->GetCampaignKind() == 1;
+		Add(MakeText(bTutorial ? TEXT("Tutorial") : TEXT("Arcade"), true, 84.f, Gold, 6.f));
+		if (Camp && !Camp->CampaignName.IsEmpty() && Camp->CampaignName != TEXT("Arcade") && Camp->CampaignName != TEXT("Tutorial"))
+		{
+			Add(MakeText(Camp->CampaignName, false, 32.f, Lavender, 3.f, true), 4.f);
+		}
+		Add(MakeText(FString::Printf(TEXT("%d of %d %s beaten"), Progress, Count, bTutorial ? TEXT("steps") : TEXT("challenges")), false, 30.f, Cyan, 3.f), 12.f);
+		if (Progress < Count)
+		{
+			Add(Btn(FString::Printf(TEXT("CONTINUE  %d"), Progress + 1), FVector2D(560.f, 136.f), Emerald, Emerald2, ActArcadeStart, Progress), 36.f);
+			Add(Btn(TEXT("START OVER"), FVector2D(560.f, 116.f), Amethyst, Amethyst2, ActArcadeStart, 0), 20.f);
+		}
+		else
+		{
+			Add(Btn(TEXT("PLAY AGAIN"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActArcadeStart, 0), 36.f);
+		}
+		Add(Btn(TEXT("BACK"), FVector2D(380.f, 110.f), Amethyst, Amethyst2, ActMenu), 24.f);
+		break;
+	}
+	case EPuzzleCard::ArcadeIntro:
+	case EPuzzleCard::ArcadeOutro:
+	case EPuzzleCard::ArcadeFail:
+	case EPuzzleCard::ArcadeDone:
+	{
+		const FArcadeChallenge* Challenge = GameMode ? GameMode->GetArcadeChallenge() : nullptr;
+		const FArcadeCampaign* Camp = GameMode ? GameMode->GetArcadeCampaign() : nullptr;
+		const bool bTutorial = GameMode && GameMode->GetCampaignKind() == 1;
+		const int32 Index = GameMode ? GameMode->GetArcadeIndex() : 0;
+		const int32 Count = GameMode ? GameMode->GetArcadeCount() : 0;
+		auto Body = [&](const FString& Text, float Size, const FLinearColor& Color, float Top)
+		{
+			UTextBlock* Block = MakeText(Text, false, Size, Color, 3.f);
+			Block->SetAutoWrapText(true);
+			// Wrapped text is drawn a little wider than the box it wraps to, so the box is narrower than the space inside the frame.
+			Add(Sized(Block, FVector2D(BodyWrapWidth, 0.f)), Top, HAlign_Center);
+		};
+		if (Card == EPuzzleCard::ArcadeDone)
+		{
+			Add(MakeText(bTutorial ? TEXT("Tutorial") : TEXT("Arcade"), true, 72.f, Gold, 6.f));
+			Add(MakeText(TEXT("COMPLETE"), true, 72.f, Gold, 6.f), -6.f);
+			if (Camp && !Camp->FinaleText.IsEmpty())
+			{
+				Body(Camp->FinaleText, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 30.f);
+			}
+			Add(Btn(TEXT("MENU"), FVector2D(380.f, 124.f), Amethyst, Amethyst2, ActMenu), 40.f);
+			break;
+		}
+		const FString Title = Challenge ? Challenge->Title : FString();
+		if (Card == EPuzzleCard::ArcadeIntro)
+		{
+			Add(MakeText(FString::Printf(TEXT("%s  %d / %d"), bTutorial ? TEXT("STEP") : TEXT("CHALLENGE"), Index + 1, Count), false, 28.f, Lavender, 3.f));
+			Add(MakeText(Title, true, Title.Len() > 14 ? 52.f : 68.f, Gold, 6.f), 6.f);
+			if (Challenge)
+			{
+				// The rules in a few lines: goal, clock, board, relics and bonus tiles.
+				TArray<FString> Relics, Bonus;
+				if (Challenge->bHolyLight) { Relics.Add(FString::Printf(TEXT("Holy Light x%d"), Challenge->HolyLightCharges)); }
+				if (Challenge->bReroll) { Relics.Add(FString::Printf(TEXT("Reroll x%d"), Challenge->RerollCharges)); }
+				if (Challenge->bPumpkin) { Bonus.Add(TEXT("pumpkin")); }
+				if (Challenge->bOutgoingBottle) { Bonus.Add(TEXT("full potion")); }
+				if (Challenge->bIncomingBottle) { Bonus.Add(TEXT("empty potion")); }
+				const int32 Seconds = Challenge->TimeLimitSeconds;
+				TArray<FString> RuleLines;
+				if (Challenge->TargetScore > 0)
+				{
+					RuleLines.Add(FString::Printf(TEXT("Reach  %d  points"), Challenge->TargetScore));
+				}
+				if (Challenge->GoalRoutes > 0)
+				{
+					RuleLines.Add(FString::Printf(TEXT("Clear  %d  route%s"), Challenge->GoalRoutes, Challenge->GoalRoutes == 1 ? TEXT("") : TEXT("s")));
+				}
+				if (Challenge->bClearBuckets)
+				{
+					RuleLines.Add(TEXT("Use every piece you are dealt"));
+				}
+				RuleLines.Add(Seconds > 0 ? FString::Printf(TEXT("Time limit  %d:%02d"), Seconds / 60, Seconds % 60) : FString(TEXT("No time limit")));
+				RuleLines.Add(FString::Printf(TEXT("Board  %dx%d"), Challenge->GridWidth, Challenge->GridHeight));
+				if (!Challenge->bHoldSlot)
+				{
+					RuleLines.Add(TEXT("No hold slot"));
+				}
+				if (Relics.Num() > 0)
+				{
+					RuleLines.Add(FString::Printf(TEXT("Relics:  %s"), *FString::Join(Relics, TEXT(", "))));
+				}
+				if (Bonus.Num() > 0)
+				{
+					RuleLines.Add(FString::Printf(TEXT("Bonus tiles:  %s"), *FString::Join(Bonus, TEXT(", "))));
+				}
+				Body(FString::Join(RuleLines, TEXT("\n")), 30.f, Cyan, 22.f);
+				if (!Challenge->IntroText.IsEmpty())
+				{
+					Body(Challenge->IntroText, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 26.f);
+				}
+			}
+			Add(Btn(TEXT("START"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActArcadeBegin), 36.f);
+		}
+		else if (Card == EPuzzleCard::ArcadeOutro)
+		{
+			const bool bLast = Index + 1 >= Count;
+			Add(MakeText(TEXT("COMPLETE!"), true, 72.f, Gold, 6.f));
+			Add(MakeText(Title, false, 38.f, PaleGold, 4.f, true), 4.f);
+			Body(FString::Printf(TEXT("score  %d"), GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->Score : 0), 30.f, Cyan, 10.f);
+			if (Challenge && !Challenge->OutroText.IsEmpty())
+			{
+				Body(Challenge->OutroText, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 26.f);
+			}
+			Add(Btn(bLast ? TEXT("FINISH") : TEXT("NEXT"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActArcadeNext), 36.f);
+		}
+		else
+		{
+			Add(MakeText(TEXT("FAILED"), true, 72.f, FLinearColor(1.f, 0.25f, 0.3f), 6.f));
+			Add(MakeText(Title, false, 38.f, PaleGold, 4.f, true), 4.f);
+			Body(GameMode ? GameMode->ArcadeFailReason : FString(), 34.f, Lavender, 14.f);
+			// How far the player got on each goal the step sets.
+			if (!Challenge || Challenge->TargetScore > 0)
+			{
+				Body(FString::Printf(TEXT("score  %d / %d"), GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->Score : 0, Challenge ? Challenge->TargetScore : 0), 30.f, Cyan, 10.f);
+			}
+			if (Challenge && Challenge->GoalRoutes > 0)
+			{
+				Body(FString::Printf(TEXT("routes  %d / %d"), FMath::Min(GameMode && GameMode->PuzzleManager ? GameMode->PuzzleManager->RoutesCleared : 0, Challenge->GoalRoutes), Challenge->GoalRoutes), 30.f, Cyan, 10.f);
+			}
+			Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(280.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(280.f, 124.f)),
+				Sized(MakeTextButton(TEXT("RETRY"), FVector2D(380.f, 124.f), Emerald, Emerald2, ActArcadeRetry), FVector2D(380.f, 124.f))), 40.f);
+		}
 		break;
 	}
 	case EPuzzleCard::GameOver:
@@ -652,6 +876,34 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 	}
 }
 
+void UPuzzleHUDWidget::OnMusicVolumeChanged(float Value)
+{
+	if (APuzzleGameMode* GameMode = GetGameMode())
+	{
+		GameMode->SetMusicVolume(Value);
+	}
+}
+
+void UPuzzleHUDWidget::OnSfxVolumeChanged(float Value)
+{
+	if (APuzzleGameMode* GameMode = GetGameMode())
+	{
+		GameMode->SetSfxVolume(Value);
+	}
+}
+
+void UPuzzleHUDWidget::OnSfxVolumeReleased()
+{
+	// Let go of the slider and hear how loud the effects are now.
+	if (APuzzleGameMode* GameMode = GetGameMode())
+	{
+		if (GameMode->ClearSound)
+		{
+			UGameplayStatics::PlaySound2D(GameMode, GameMode->ClearSound, GameMode->SfxVolume);
+		}
+	}
+}
+
 void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 {
 	APuzzleGameMode* GameMode = GetGameMode();
@@ -671,12 +923,31 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 	case ActResume:  GameMode->ClosePauseMenu(); break;
 	case ActTakeOver: GameMode->TakeOver(); break;
 	case ActStartDemo: GameMode->StartDemo(); break;
+	case ActArcade:      GameMode->OpenCampaign(Param); break;
+	case ActArcadeStart: GameMode->StartArcade(Param); break;
+	case ActArcadeBegin: GameMode->BeginArcadeChallenge(); break;
+	case ActArcadeNext:  GameMode->ArcadeAdvance(); break;
+	case ActArcadeRetry: GameMode->ArcadeRetry(); break;
+	case ActExit:
+		UKismetSystemLibrary::QuitGame(GameMode, GetOwningPlayer(), EQuitPreference::Quit, false);
+		break;
 	case ActCourses: ShowCard(EPuzzleCard::Courses); break;
 	case ActCourse:
 		GameMode->SetCourse(Param / 10, Param % 10);
 		GameMode->ShowMenu();
 		break;
 	case ActOptions: ShowCard(EPuzzleCard::Options); break;
+	case ActToggleGraphics:
+		GameMode->SetLowGraphics(!GameMode->IsLowGraphics()); // reloads the map
+		break;
+	case ActToggleOrientation:
+		GameMode->SetPortrait(!GameMode->IsPortrait());
+		RefreshCard();
+		break;
+	case ActToggleScreen:
+		GameMode->SetFullscreen(!GameMode->IsFullscreen());
+		RefreshCard();
+		break;
 	case ActToggleRelics:
 	case ActToggleBonus:
 		if (const UPuzzleManager* Rules = GameMode->PuzzleManager.Get())
@@ -734,8 +1005,8 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	{
 		Pages.Add({ TEXT("Bonus Tiles"),
 		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
-		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 1000 points, and a full potion (OUT) with an empty potion (IN) every 10000. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
-		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A chain from the full potion to the empty one is worth 1000.") });
+		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 200 points, and a full potion (OUT) with an empty potion (IN) every 600. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
+		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A pumpkin is worth 25 points and a potion 50, plus 2 for every tile of the chain. A chain from the full potion to the empty one is worth 100.") });
 	}
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{
@@ -790,7 +1061,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 
 	UTextBlock* Body = MakeText(Page.Body, false, 30.f, FLinearColor(0.9f, 0.86f, 1.f), 3.f);
 	Body->SetAutoWrapText(true);
-	Add(Body, 30.f, HAlign_Fill);
+	Add(Sized(Body, FVector2D(BodyWrapWidth, 0.f)), 30.f, HAlign_Center);
 
 	// Page dots.
 	UHorizontalBox* Dots = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -1103,7 +1374,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		const int32 Charges = Rules->GetRelicCharges(static_cast<ERelic>(RelicIndex));
 		RelicCounts[RelicIndex]->SetText(FText::AsNumber(Charges));
 		// Never disabled (Slate's disabled look greys the icon out); clicks are ignored by the game mode instead.
-		RelicBadges[RelicIndex]->SetVisibility(bPlayingView && Rules->bRelicsEnabled ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		RelicBadges[RelicIndex]->SetVisibility(bPlayingView && Rules->IsRelicEnabled(static_cast<ERelic>(RelicIndex)) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 		RelicBadges[RelicIndex]->SetRenderOpacity(Charges > 0 && (bInput || GameMode->bAutoPlayEnabled) ? 1.f : 0.5f);
 
 		RelicPop[RelicIndex] = FMath::Max(RelicPop[RelicIndex] - InDeltaTime * 2.f, 0.f);
@@ -1180,6 +1451,29 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		Hint = Rules->bRelicsEnabled ? TEXT("No room! Use a relic") : TEXT("No room left");
 		HintColor = FLinearColor(1.f, 0.3f, 0.25f, 0.75f + 0.25f * FMath::Sin(Time * 8.f));
 	}
+	else if (GameMode->IsArcade() && GameMode->GetArcadeState() == EArcadeState::Playing && GameMode->GetArcadeChallenge())
+	{
+		const FArcadeChallenge* Challenge = GameMode->GetArcadeChallenge();
+		Hint = FString::Printf(TEXT("%d/%d  %s"), GameMode->GetArcadeIndex() + 1, GameMode->GetArcadeCount(), *Challenge->Title);
+		if (Challenge->TargetScore > 0)
+		{
+			Hint += FString::Printf(TEXT("\nGOAL  %d / %d"), Rules->Score, Challenge->TargetScore);
+		}
+		if (Challenge->GoalRoutes > 0)
+		{
+			Hint += FString::Printf(TEXT("\nROUTES  %d / %d"), FMath::Min(Rules->RoutesCleared, Challenge->GoalRoutes), Challenge->GoalRoutes);
+		}
+		HintColor = PaleGold;
+		if (Challenge->TimeLimitSeconds > 0)
+		{
+			const int32 Left = FMath::CeilToInt(GameMode->GetArcadeTimeLeft());
+			Hint += FString::Printf(TEXT("\nTIME  %d:%02d"), Left / 60, Left % 60);
+			if (Left <= 10)
+			{
+				HintColor = FLinearColor(1.f, 0.3f, 0.25f, 0.75f + 0.25f * FMath::Sin(Time * 8.f));
+			}
+		}
+	}
 	else if (GameMode->Flow == EPuzzleFlow::Playing)
 	{
 		Hint = (GameMode->InputHandler && GameMode->InputHandler->IsHoveringReserve()) ? TEXT("Drop to hold it for later") : TEXT("Drag a piece onto the board");
@@ -1190,7 +1484,7 @@ void UPuzzleHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	// HOLD label under the reserve slot.
 	APlayerController* PC = GetOwningPlayer();
 	FVector2D HoldPosition;
-	if (GameMode->GridManager && PC && bPlayingView
+	if (GameMode->GridManager && GameMode->GridManager->bHoldEnabled && PC && bPlayingView
 		&& UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, GameMode->GridManager->GetTrayAnchorWorldLocation(AGridManager::ReserveSlot) + FVector(0.f, 100.f, 0.f), HoldPosition, true))
 	{
 		HoldLabel->SetVisibility(ESlateVisibility::HitTestInvisible);

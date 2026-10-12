@@ -28,6 +28,32 @@ public:
 	UPROPERTY()
 	bool bOptionBonusTiles = false;
 
+	// Volume sliders in the options card (0 to 1).
+	UPROPERTY()
+	float MusicVolume = 0.7f;
+
+	UPROPERTY()
+	float SfxVolume = 0.8f;
+
+	// Options card: Graphics Low (the lightweight scene) on a PC, and the window mode the player chose
+	// (-1 not chosen yet: the engine's own setting stays; 0 windowed, 1 fullscreen).
+	UPROPERTY()
+	bool bLowGraphics = false;
+
+	UPROPERTY()
+	int32 DisplayMode = -1;
+
+	// Phones and tablets: hold the screen upright (portrait) instead of sideways (landscape, the default).
+	UPROPERTY()
+	bool bPortrait = false;
+
+	// Arcade and tutorial: how many steps of the campaign are beaten in a row.
+	UPROPERTY()
+	int32 ArcadeProgress = 0;
+
+	UPROPERTY()
+	int32 TutorialProgress = 0;
+
 	// The "How to play" pages open by themselves on the very first launch only.
 	UPROPERTY()
 	bool bSeenTutorial = false;

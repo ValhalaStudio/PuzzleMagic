@@ -1,0 +1,266 @@
+{
+  "format": 1,
+  "kind": "tutorial",
+  "name": "Tutorial",
+  "finale": "That is all there is to it. Time to play the real thing!",
+  "steps": [
+    {
+      "title": "Your first route",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        4,
+        4
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "A ROUTE is a chain of hands, each pointing at the next, running from one side of the board to the far side. Drag the piece onto any row: its hands all point right, so it fills the row from the left edge to the right edge.",
+      "outro": "That is a route! The whole chain breaks apart and scores.",
+      "hint": "Drag the piece onto the board.",
+      "board": [],
+      "tray": {
+        "after": "end",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  3,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "purple"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Finish the chain",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        5,
+        5
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Two hands are already on the board, pointing right from the left edge. Complete the chain so it reaches the right edge.",
+      "outro": "A chain has to START on a hand at the edge that points away from it, and END on a hand at the far edge that points straight out.",
+      "hint": "Fill the rest of the row.",
+      "board": [
+        {
+          "x": 0,
+          "y": 2,
+          "color": "red",
+          "dir": "right"
+        },
+        {
+          "x": 1,
+          "y": 2,
+          "color": "red",
+          "dir": "right"
+        }
+      ],
+      "tray": {
+        "after": "random",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "black"
+            }
+          ],
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "black"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Turning a corner",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        4,
+        4
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Routes can turn. This chain goes right, then up, and leaves through the top edge. The piece points up: place it where it finishes the chain.",
+      "outro": "Routes may leave through a side next to where they started, too.",
+      "hint": "Finish the chain at the top edge.",
+      "board": [
+        {
+          "x": 0,
+          "y": 1,
+          "color": "purple",
+          "dir": "right"
+        },
+        {
+          "x": 1,
+          "y": 1,
+          "color": "purple",
+          "dir": "right"
+        },
+        {
+          "x": 2,
+          "y": 1,
+          "color": "purple",
+          "dir": "up"
+        }
+      ],
+      "tray": {
+        "after": "random",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "dirs": [
+                "up",
+                "up"
+              ],
+              "color": "red"
+            }
+          ],
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "dirs": [
+                "up",
+                "up"
+              ],
+              "color": "red"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Now with a clock",
+      "goal": 60,
+      "goalRoutes": 0,
+      "timeLimit": 60,
+      "grid": [
+        5,
+        5
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Now play freely. Build routes and reach 60 points before the clock runs out.",
+      "outro": "You are ready for the arcade.",
+      "hint": "Build routes of any length.",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    }
+  ]
+}

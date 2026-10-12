@@ -3,6 +3,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
+#include "PuzzleLite.h"
 
 namespace
 {
@@ -55,6 +56,11 @@ APuzzleFX::FParticle& APuzzleFX::AddQuad(EKind Kind, const FVector& Location, co
 
 void APuzzleFX::AddSparkle(const FVector& Location, const FLinearColor& Color, float Delay)
 {
+	// Every effect piece is a quad with its own material instance: a weak mobile CPU and GPU get a third of them.
+	if (PuzzleLite::IsLite() && FMath::RandRange(0, 2) != 0)
+	{
+		return;
+	}
 	FParticle& P = AddQuad(EKind::Sparkle, Location, Color, ShapeSparkle, Delay, FMath::FRandRange(0.8f, 1.3f));
 	P.Velocity = FVector(FMath::FRandRange(-110.f, 110.f), FMath::FRandRange(-110.f, 110.f), FMath::FRandRange(80.f, 180.f));
 	const float Size = FMath::FRandRange(0.35f, 0.7f);
@@ -74,6 +80,11 @@ void APuzzleFX::AddStrip(const FVector& Center, const FVector2D& Size, float Yaw
 
 void APuzzleFX::AddRing(const FVector& Center, float Radius, const FLinearColor& Color, float Delay)
 {
+	// Big additive rings cover many pixels; smaller ones on mobile.
+	if (PuzzleLite::IsLite())
+	{
+		Radius *= 0.6f;
+	}
 	FParticle& P = AddQuad(EKind::Ring, Center, Color, ShapeRing, Delay, 0.7f);
 	P.BaseScale = FVector2D(Radius * 2.f / 100.f, Radius * 2.f / 100.f);
 	P.Intensity = 2.5f;
@@ -101,13 +112,14 @@ void APuzzleFX::AddStream(const TArray<FVector>& Points, const FLinearColor& Col
 
 	// Droplets leave the start one after another, each running the whole path: a continuous flow.
 	const float Life = Total / Speed;
-	const float Gap = 0.05f;
-	const int32 Drops = FMath::Clamp(FMath::CeilToInt(Life / Gap) + 4, 6, 70);
+	const bool bLite = PuzzleLite::IsLite();
+	const float Gap = bLite ? 0.12f : 0.05f;
+	const int32 Drops = FMath::Clamp(FMath::CeilToInt(Life / Gap) + 4, 6, bLite ? 20 : 70);
 	for (int32 I = 0; I < Drops; ++I)
 	{
 		FParticle& P = AddQuad(EKind::Drop, Points[0], Color, ShapeStrip, Delay + I * Gap, Life);
 		P.Stream = StreamIndex;
-		P.BaseScale = FVector2D(0.95f, 0.5f);
+		P.BaseScale = bLite ? FVector2D(1.4f, 0.6f) : FVector2D(0.95f, 0.5f);
 		P.Intensity = 3.2f;
 	}
 }

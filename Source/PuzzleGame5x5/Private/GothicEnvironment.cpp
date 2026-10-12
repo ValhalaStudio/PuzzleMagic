@@ -28,6 +28,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "PuzzleGameMode.h"
+#include "PuzzleLite.h"
+#include "Engine/StaticMeshActor.h"
 #include "PuzzleManager.h"
 
 namespace GothicLayout
@@ -128,10 +130,54 @@ void AGothicEnvironment::AddCandle(const FVector& Base, float Height, float Radi
 	Candle.BaseIntensity = CandleIntensity;
 }
 
+float AGothicEnvironment::SfxScale() const
+{
+	const APuzzleGameMode* Mode = Cast<APuzzleGameMode>(UGameplayStatics::GetGameMode(this));
+	// The effects were tuned at the default slider position (0.8).
+	return Mode ? Mode->SfxVolume / 0.8f : 1.f;
+}
+
+void AGothicEnvironment::SetBoardLightOn(bool bOn)
+{
+	BoardLight->SetVisibility(bOn);
+}
+
+void AGothicEnvironment::BuildLite()
+{
+	// One soft key light over the play area, no shadows. Everything else is the backdrop picture and sprites.
+	const FVector LightLocation(0.f, 1300.f, 1700.f);
+	BoardLight->SetWorldLocation(LightLocation);
+	BoardLight->SetWorldRotation((FVector(0.f, 60.f, 0.f) - LightLocation).Rotation());
+	BoardLight->SetIntensityUnits(ELightUnits::Candelas);
+	BoardLight->SetIntensity(BoardLightIntensity);
+	BoardLight->SetLightColor(FLinearColor(1.f, 0.9f, 0.78f));
+	BoardLight->SetInnerConeAngle(16.f);
+	BoardLight->SetOuterConeAngle(26.f);
+	BoardLight->SetAttenuationRadius(4000.f);
+	BoardLight->SetCastShadows(false);
+	LightningLight->SetVisibility(false);
+
+	// The map's own floor and the height fog are not drawn: the backdrop picture stands in for them.
+	for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+	{
+		It->SetActorHiddenInGame(true);
+	}
+	for (TActorIterator<AExponentialHeightFog> It(GetWorld()); It; ++It)
+	{
+		It->SetActorHiddenInGame(true);
+	}
+}
+
 void AGothicEnvironment::BeginPlay()
 {
 	Super::BeginPlay();
 	using namespace GothicLayout;
+	if (PuzzleLite::IsLite())
+	{
+		bLite = true;
+		BuildLite();
+		return;
+	}
 
 	// Wall and the stained glass just behind it share one layout; the wall's
 	// window areas are cut out so light and the glass both show through.
@@ -388,10 +434,15 @@ void AGothicEnvironment::BuildEldritch()
 		}
 	}
 
+	// The madness post-process does not compile for the mobile renderer (the engine would paint its default material
+	// over the whole screen), so phones and tablets go without it.
+#if !(PLATFORM_ANDROID || PLATFORM_IOS)
+	if (!PuzzleLite::IsLite()) // Low graphics goes without it too
 	if (UMaterialInterface* MadnessMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_PPMadness.M_PPMadness")))
 	{
 		MadnessMID = UMaterialInstanceDynamic::Create(MadnessMaterial, this);
 	}
+#endif
 
 	// Fog pooled on the floor behind the board and in front of the tray.
 	struct FFogSpec { FVector Location; FVector Scale; float Density; };
@@ -460,7 +511,7 @@ void AGothicEnvironment::TickEldritch(float Time, float DeltaTime, float& OutLig
 		NextFlickerTime = Time + FMath::Lerp(45.f, 9.f, Dread) * FMath::FRandRange(0.7f, 1.3f);
 		if (FlickerSound)
 		{
-			UGameplayStatics::PlaySound2D(this, FlickerSound, 0.25f + 0.35f * Dread);
+			UGameplayStatics::PlaySound2D(this, FlickerSound, (0.25f + 0.35f * Dread) * SfxScale());
 		}
 	}
 	float Stutter = 1.f;
@@ -540,7 +591,7 @@ void AGothicEnvironment::TickEldritch(float Time, float DeltaTime, float& OutLig
 	{
 		// Calm: only the deep-water air. Rising dread brings in the drone, then the endless falling
 		// Shepard tone, then the whispers, while the whole bed darkens (filter closes).
-		AbyssAudio->SetVolumeMultiplier(0.35f);
+		AbyssAudio->SetVolumeMultiplier(0.35f * SfxScale());
 		AbyssAudio->SetFloatParameter(TEXT("Air"), 1.f - 0.5f * Dread);
 		AbyssAudio->SetFloatParameter(TEXT("Drone"), 0.15f + 0.85f * Dread);
 		AbyssAudio->SetFloatParameter(TEXT("Shepard"), FMath::Pow(Dread, 1.5f));
@@ -549,7 +600,7 @@ void AGothicEnvironment::TickEldritch(float Time, float DeltaTime, float& OutLig
 	}
 	else if (AbyssAudio)
 	{
-		AbyssAudio->SetVolumeMultiplier(0.02f + 0.55f * Dread);
+		AbyssAudio->SetVolumeMultiplier((0.02f + 0.55f * Dread) * SfxScale());
 	}
 
 	// The fog breathes with the room and thickens, faintly glowing green, as dread rises.
@@ -744,6 +795,10 @@ void AGothicEnvironment::TickMotes(float Time, float DeltaTime, float LightScale
 void AGothicEnvironment::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (bLite)
+	{
+		return;
+	}
 
 	const float Time = GetWorld()->GetTimeSeconds();
 
@@ -809,7 +864,7 @@ void AGothicEnvironment::Tick(float DeltaTime)
 		ThunderTime = -1.f;
 		if (ThunderSound)
 		{
-			UGameplayStatics::PlaySound2D(this, ThunderSound, ThunderVolume, FMath::FRandRange(0.85f, 1.1f));
+			UGameplayStatics::PlaySound2D(this, ThunderSound, ThunderVolume * SfxScale(), FMath::FRandRange(0.85f, 1.1f));
 		}
 	}
 }
