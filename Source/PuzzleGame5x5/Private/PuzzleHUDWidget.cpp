@@ -678,6 +678,11 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 			Add(ButtonRow(GraphicsButton, ScreenButton), 28.f);
 #endif
 		}
+		// The Classic look: the Route puzzle MVP's triangle tiles and bonus symbols, without the Halloween scenery (test option).
+		{
+			const bool bClassicNow = GameMode && GameMode->IsClassicLook();
+			Add(Btn(bClassicNow ? TEXT("LOOK  CLASSIC") : TEXT("LOOK  HALLOWEEN"), FVector2D(440.f, 84.f), bClassicNow ? Amethyst : Emerald, bClassicNow ? Amethyst2 : Emerald2, ActToggleLook), 20.f);
+		}
 		auto VolumeSlider = [this](float Value, bool bMusic) -> UWidget*
 		{
 			USlider* Slider = WidgetTree->ConstructWidget<USlider>();
@@ -943,6 +948,9 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 	case ActToggleOrientation:
 		GameMode->SetPortrait(!GameMode->IsPortrait());
 		RefreshCard();
+		break;
+	case ActToggleLook:
+		GameMode->SetClassicLook(!GameMode->IsClassicLook()); // reloads the map
 		break;
 	case ActToggleScreen:
 		GameMode->SetFullscreen(!GameMode->IsFullscreen());

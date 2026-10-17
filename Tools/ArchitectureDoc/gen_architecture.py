@@ -487,6 +487,7 @@ CLASSES = [
 
     ("AHalloweenProps", "atmos", "Halloween scenery beside the board: two iron cauldrons of bubbling lime-green liquid with steam and a flickering green glow, and bats that circle above them or cross the top of the scene. On phones and tablets (or with -lite) it is replaced by the lightweight mode: a pre-rendered backdrop picture and flat bat and steam sprites riding on the camera, plus a resolution controller that holds about 30 frames a second.", False),
     ("AGothicEnvironment", "atmos", "The cathedral around the board and its moods: wall, stained glass, Blender-made piers, candles, flagstones, ambient storms, and the Lovecraftian layer. Dread (low luck) drives breathing and stuttering light, tentacles, eyes, fog, motes, the madness post-process, the MetaSound ambience and the convolution reverb.", False),
+    ("PuzzleStyle", "atmos", "IsClassic(): the Classic look (Route puzzle MVP: triangle tiles, older colours and bonus symbols, no Halloween props or streams), a Play options test option that reloads the map.", False),
     ("PuzzleLite", "atmos", "IsLite(): whether the lightweight scene is used (phones and tablets, or -lite on a PC; on Android debug.puzzle.lite 0 turns it off for comparisons).", False),
     ("EldritchNoise", "atmos", "Fractal noise for organic shapes and light: FastNoise2 SIMD on Windows, FMath::PerlinNoise elsewhere.", False),
 ]
@@ -564,6 +565,7 @@ FLAG_TEXT = {
     "tutorialpage": "Open How to Play at page N (0-based).",
     "dread": "Hold dread at X or above, 0 to 1. For testing and recordings.",
     "grid": "Board size, each side 4 to 8, for example 5x7.",
+    "classic": "Forces the Classic look (triangle tiles, older bonus symbols, no Halloween props); the Play options button does the same and is saved. With -backdropcapture it renders the Classic backdrop.",
     "backdropcapture": "PC only: ten seconds in, hide the board, tiles and interface, save a 1920x1080 shot (Saved/Screenshots) and quit. Renders the lightweight mode's backdrop picture (use with -demo -grid=8x8).",
     "recordaudio": "Record the game's audio mix for N seconds to Saved/Recording/demo_audio.wav, then quit.",
 }
@@ -571,6 +573,8 @@ FLAG_TEXT = {
 FLAG_ARG = {"grid": "=WxH", "tutorialpage": "=N", "dread": "=X", "recordaudio": "=N"}
 
 SCRIPTS = [
+    ("build_classic_route_tiles.py", "Unreal editor Python", "M_TileRouteClassic: the Classic look's tile material with a triangle on every tile (the Route puzzle MVP's version of build_route_tiles.py)."),
+    ("build_classic_bonus_tiles.py", "Unreal editor Python", "M_TileBonusClassic: the Classic look's bonus tiles (diamond outgoing, fisheye incoming, plain basic)."),
     ("build_packages.ps1", "PowerShell", "Compiles the editor target and builds the Windows and Android test packages (finds the engine, retries a failed cook, zips Windows)."),
     ("package_windows.py", "Python", "Zips a packaged Windows build with forward-slash paths, the campaign editor and the starter campaigns."),
     ("dev_chat_sync.py", "Python", "Appends the new messages of the Claude Code conversation to dev_chat.log in the project folder (a readable progress log kept for the designer; git-ignored)."),

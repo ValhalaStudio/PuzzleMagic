@@ -12,6 +12,7 @@
 #include "GothicEnvironment.h"
 #include "HalloweenProps.h"
 #include "PuzzleLite.h"
+#include "PuzzleStyle.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Engine/GameViewportClient.h"
@@ -83,7 +84,27 @@ void APuzzleGameMode::InitGame(const FString& MapName, const FString& Options, F
 	if (UPuzzleSaveGame* Early = UPuzzleSaveGame::LoadOrCreate())
 	{
 		PuzzleLite::SetLowGraphics(Early->bLowGraphics && !PuzzleLite::IsMobile());
+		// -classic forces the Classic look (also used to render its backdrop picture with -backdropcapture).
+		PuzzleStyle::SetClassic(Early->bClassicLook || FParse::Param(FCommandLine::Get(), TEXT("classic")));
 	}
+}
+
+bool APuzzleGameMode::IsClassicLook() const
+{
+	return PuzzleStyle::IsClassic();
+}
+
+void APuzzleGameMode::SetClassicLook(bool bClassic)
+{
+	if (!SaveGame || (SaveGame->bClassicLook == bClassic && PuzzleStyle::IsClassic() == bClassic))
+	{
+		return;
+	}
+	SaveGame->bClassicLook = bClassic;
+	SaveGame->Save();
+	PuzzleStyle::SetClassic(bClassic);
+	// Tile materials and the scenery are chosen when the map starts, so it is loaded again.
+	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
 }
 
 bool APuzzleGameMode::IsLowGraphics() const

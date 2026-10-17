@@ -35,6 +35,9 @@ every bucket is used up"). Code: `CampaignData.*` (parsing), `PuzzleArcade.cpp` 
 - The scenery pictures sit at depths that scale with the camera distance; a fixed depth once hid the board on a 20:9 phone.
 - Android Orientation must be the plain name (`Orientation=Sensor`); the `EAndroidScreenOrientation::` form silently becomes landscape.
   The options card has a Landscape/Portrait toggle (saved). `bUseExternalFilesDir=True` is needed for saves on Android 11+.
+- Classic look (Play options, saved, `-classic` flag): the Route puzzle MVP as before the Halloween theme (triangle tiles, older colours,
+  diamond/fisheye/plain bonus tiles, no cauldrons/bats/streams). `PuzzleStyle::IsClassic()` picks tile materials and colours; the low-spec
+  scene has its own backdrop `T_LiteBackdropClassic`. Materials come from `Tools/build_classic_*_tiles.py`.
 - Card titles shrink to fit the frame and long text wraps in a 640-unit box: wrapped text draws about 15% wider than its box.
 
 ## Workflows (project skills in `.claude/skills/`, usable in any Claude Code session here)

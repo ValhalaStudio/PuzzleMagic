@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PuzzleStyle.h"
 #include "PuzzleTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -92,6 +93,16 @@ namespace PuzzleTypes
 	// The colour of a bonus kind's effects and popups: pumpkin orange, potion magenta.
 	inline FLinearColor BonusToColor(EPuzzleBonus Kind)
 	{
+		if (PuzzleStyle::IsClassic())
+		{
+			switch (Kind)
+			{
+			case EPuzzleBonus::Basic:    return FLinearColor(1.00f, 0.93f, 0.55f);
+			case EPuzzleBonus::Outgoing: return FLinearColor(0.10f, 0.85f, 1.00f);
+			case EPuzzleBonus::Incoming: return FLinearColor(1.00f, 0.25f, 0.70f);
+			default:                     return FLinearColor::White;
+			}
+		}
 		switch (Kind)
 		{
 		case EPuzzleBonus::Basic:    return FLinearColor(1.00f, 0.45f, 0.05f);
@@ -125,10 +136,35 @@ namespace PuzzleTypes
 		return Offset.Y > 0 ? EPuzzleDir::Up : EPuzzleDir::Down;
 	}
 
+	// The number the Classic tile material uses for a colour: red and purple tiles get a gold triangle, the light ones (green,
+	// blue) a red one (the material's old numbering: 0 red, 1 green, 2 blue, 4 purple).
+	inline float ClassicSymbolIndex(EPuzzleTileColor Color)
+	{
+		switch (Color)
+		{
+		case EPuzzleTileColor::Red:    return 0.f;
+		case EPuzzleTileColor::Ash:    return 1.f;
+		case EPuzzleTileColor::Black:  return 2.f;
+		default:                       return 4.f;
+		}
+	}
+
 	// Bright cartoon palette (linear). Each colour also owns a symbol: see M_ToonTile
 	// (Red blood drop, Green skull, Blue moon, Yellow cross, Purple bat).
 	inline FLinearColor ToLinearColor(EPuzzleTileColor Color)
 	{
+		if (PuzzleStyle::IsClassic())
+		{
+			// The older palette, on the four colours the game has now (the old yellow is gone): blue, purple, red, green.
+			switch (Color)
+			{
+			case EPuzzleTileColor::Black:  return FLinearColor(0.12f, 0.38f, 0.95f);
+			case EPuzzleTileColor::Purple: return FLinearColor(0.52f, 0.16f, 0.88f);
+			case EPuzzleTileColor::Red:    return FLinearColor(0.90f, 0.10f, 0.14f);
+			case EPuzzleTileColor::Ash:    return FLinearColor(0.16f, 0.66f, 0.18f);
+			default:                       return FLinearColor::White;
+			}
+		}
 		switch (Color)
 		{
 		case EPuzzleTileColor::Black:  return FLinearColor(0.025f, 0.025f, 0.03f);

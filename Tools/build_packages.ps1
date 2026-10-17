@@ -5,13 +5,14 @@ Builds the test packages: compiles the editor target, cooks and packages Windows
 
 With neither -Win nor -Android, both are built. Defaults: the engine named by the .uproject's EngineAssociation (looked up in the
 registry, then under the usual folders) and the folder PuzzleMagic_Builds next to the repo. Android needs the Android SDK (adb and
-the NDK 27.2.12479018) and JDK 21; set ANDROID_HOME and JAVA_HOME if they are not in their usual places.
+the NDK 27.2.12479018) and JDK 21 (found under Program Files, or pass -Jdk); set ANDROID_HOME if the SDK is not in its usual place.
 Close the editor and any running game first, and never run two builds at once. The cook sometimes dies at teardown with an engine
 ensure after "Done!"; each package is retried once.
 #>
 param(
   [switch]$Win, [switch]$Android, [switch]$SkipCompile, [switch]$DryRun,
   [string]$Ue = "",
+  [string]$Jdk = "",
   [string]$Out = ""
 )
 $ErrorActionPreference = "Stop"
@@ -70,7 +71,11 @@ if ($Android) {
   $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
   if (-not $env:NDKROOT) { $env:NDKROOT = Join-Path $env:ANDROID_HOME "ndk\27.2.12479018" }
   $env:NDK_ROOT = $env:NDKROOT
-  if (-not $env:JAVA_HOME) { $env:JAVA_HOME = "C:\Program Files\Java\jdk-21" }
+  # Gradle needs Java 11 or newer and the engine's Android setup expects JDK 21: an old JAVA_HOME (Java 8) breaks the APK step.
+  $jdk = $Jdk
+  if (-not $jdk) { foreach ($pattern in "C:\Program Files\Java\jdk-21*", "C:\Program Files\Eclipse Adoptium\jdk-21*", "C:\Program Files\Microsoft\jdk-21*") { $f = Get-Item $pattern -ErrorAction SilentlyContinue | Select-Object -First 1; if ($f) { $jdk = $f.FullName; break } } }
+  if ($jdk) { $env:JAVA_HOME = $jdk } elseif (-not $env:JAVA_HOME) { throw "no JDK 21 found: install it or pass -Jdk <folder>" }
+  Write-Host "JAVA_HOME: $env:JAVA_HOME"
   $dir = Join-Path $Out "AndroidDev"
   Run-Uat ($common + @("-platform=Android", "-cookflavor=ASTC", "-package", "-archivedirectory=$dir")) (Join-Path $Out "android_dev_build.log")
   Copy-Item (Join-Path $dir "PuzzleGame5x5-arm64.apk") (Join-Path $Out "PuzzleMagic_Android_test.apk") -Force

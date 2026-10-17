@@ -189,6 +189,10 @@ public:
 	int32 LastWindowMode = -1; // 1 fullscreen, 0 windowed; Tick watches it, since Alt+Enter and F11 change it too
 	void SetFullscreen(bool bFullscreen);
 
+	// The Classic look (a test option in Play options). Changing it reloads the map, which builds the scenery in the new look.
+	bool IsClassicLook() const;
+	void SetClassicLook(bool bClassic);
+
 	// Phones and tablets: the Landscape / Portrait choice of the options card (locks the screen that way).
 	bool IsPortrait() const;
 	void SetPortrait(bool bPortrait);

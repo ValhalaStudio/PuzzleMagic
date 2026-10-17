@@ -109,7 +109,7 @@ private:
 	enum EAction : int32
 	{
 		ActPlay, ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
-		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus, ActToggleGraphics, ActToggleScreen, ActToggleOrientation,
+		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus, ActToggleGraphics, ActToggleScreen, ActToggleOrientation, ActToggleLook,
 		ActCourse,  // Param = width * 10 + height
 		ActExit,
 		ActArcade, ActArcadeStart, ActArcadeBegin, ActArcadeNext, ActArcadeRetry // ActArcadeStart's Param = challenge to start at

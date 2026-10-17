@@ -701,8 +701,10 @@ void AGridManager::PopCells(const TArray<int32>& Indices, const FVector2D& Centr
 		}
 		// A bonus tile plays its own clear first (potion drains or fills, pumpkin swells), then bursts.
 		const bool bBonusTile = BonusKind != EPuzzleBonus::None;
-		const float BurstDelay = PopDelay + (bBonusTile ? 0.9f : 0.f);
-		if (bBonusTile)
+		// (the Classic look has no such animation: a bonus tile pops like any other)
+		const bool bBonusAnim = bBonusTile && !PuzzleStyle::IsClassic();
+		const float BurstDelay = PopDelay + (bBonusAnim ? 0.9f : 0.f);
+		if (bBonusAnim)
 		{
 			Tile->PlayBonusClear(PopDelay, BonusKind == EPuzzleBonus::Basic ? 3.2f : 1.f);
 		}
@@ -1057,13 +1059,17 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 			}
 			FX->AddStream(Points, Color, ClearDelay, FlowSpeed);
 		};
-		for (const FRouteInfo& Info : Routes)
+		// The glowing streams along a cleared route belong to the Halloween look.
+		if (!PuzzleStyle::IsClassic())
 		{
-			StreamAlong(Info.Cells, FLinearColor(0.45f, 1.0f, 0.05f) * 1.7f, true);
-		}
-		for (const FBonusEvent& Event : Bonuses)
-		{
-			StreamAlong(Event.Cells, PuzzleTypes::BonusToColor(Event.bLinked ? EPuzzleBonus::Outgoing : Event.Kind) * 1.6f, false);
+			for (const FRouteInfo& Info : Routes)
+			{
+				StreamAlong(Info.Cells, FLinearColor(0.45f, 1.0f, 0.05f) * 1.7f, true);
+			}
+			for (const FBonusEvent& Event : Bonuses)
+			{
+				StreamAlong(Event.Cells, PuzzleTypes::BonusToColor(Event.bLinked ? EPuzzleBonus::Outgoing : Event.Kind) * 1.6f, false);
+			}
 		}
 		for (int32 Index : Circuits)
 		{

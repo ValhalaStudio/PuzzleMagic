@@ -14,6 +14,7 @@
 #include "Misc/App.h"
 #include "HAL/IConsoleManager.h"
 #include "PuzzleLite.h"
+#include "PuzzleStyle.h"
 
 namespace
 {
@@ -256,9 +257,15 @@ void AHalloweenProps::BuildLite()
 
 	UMaterialInterface* BackdropMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_LiteBackdrop.M_LiteBackdrop"));
 	UMaterialInterface* SpriteMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_LiteSprite.M_LiteSprite"));
-	UTexture2D* BackdropTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBackdrop.T_LiteBackdrop"));
-	UTexture2D* BatTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBat.T_LiteBat"));
-	UTexture2D* SteamTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteSteam.T_LiteSteam"));
+	// The Classic look has its own picture (the cathedral without the cauldrons) and no sprites.
+	const bool bClassicLook = PuzzleStyle::IsClassic();
+	UTexture2D* BackdropTexture = LoadObject<UTexture2D>(nullptr, bClassicLook ? TEXT("/Game/Lite/T_LiteBackdropClassic.T_LiteBackdropClassic") : TEXT("/Game/Lite/T_LiteBackdrop.T_LiteBackdrop"));
+	if (!BackdropTexture)
+	{
+		BackdropTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBackdrop.T_LiteBackdrop"));
+	}
+	UTexture2D* BatTexture = bClassicLook ? nullptr : LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBat.T_LiteBat"));
+	UTexture2D* SteamTexture = bClassicLook ? nullptr : LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteSteam.T_LiteSteam"));
 	if (!BackdropMaterial || !SpriteMaterial)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("HalloweenProps: lightweight materials are missing (run Tools/build_lite_assets.py)"));
