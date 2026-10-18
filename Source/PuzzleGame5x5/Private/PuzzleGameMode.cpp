@@ -12,6 +12,8 @@
 #include "GothicEnvironment.h"
 #include "HalloweenProps.h"
 #include "PuzzleLite.h"
+#include "PuzzleStyle.h"
+#include "TrickOrTreat.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "Engine/GameViewportClient.h"
@@ -83,7 +85,27 @@ void APuzzleGameMode::InitGame(const FString& MapName, const FString& Options, F
 	if (UPuzzleSaveGame* Early = UPuzzleSaveGame::LoadOrCreate())
 	{
 		PuzzleLite::SetLowGraphics(Early->bLowGraphics && !PuzzleLite::IsMobile());
+		// -classic forces the Classic look (also used to render its backdrop picture with -backdropcapture).
+		PuzzleStyle::SetClassic(Early->bClassicLook || FParse::Param(FCommandLine::Get(), TEXT("classic")));
 	}
+}
+
+bool APuzzleGameMode::IsClassicLook() const
+{
+	return PuzzleStyle::IsClassic();
+}
+
+void APuzzleGameMode::SetClassicLook(bool bClassic)
+{
+	if (!SaveGame || (SaveGame->bClassicLook == bClassic && PuzzleStyle::IsClassic() == bClassic))
+	{
+		return;
+	}
+	SaveGame->bClassicLook = bClassic;
+	SaveGame->Save();
+	PuzzleStyle::SetClassic(bClassic);
+	// Tile materials and the scenery are chosen when the map starts, so it is loaded again.
+	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
 }
 
 bool APuzzleGameMode::IsLowGraphics() const
@@ -227,6 +249,14 @@ void APuzzleGameMode::StartPlay()
 
 	BotPlayer = NewObject<UPuzzleBotPlayer>(this);
 	BotPlayer->Init(GridManager, PuzzleManager);
+
+	TrickOrTreat = NewObject<UTrickOrTreat>(this);
+	TrickOrTreat->Init(PuzzleManager, GridManager);
+	// -treatpacket: a packet arrives a moment into every round (combos, relics and luck switch on for it), for the trailer.
+	if (FParse::Param(FCommandLine::Get(), TEXT("treatpacket")))
+	{
+		PuzzleManager->SetExtrasEnabled(true);
+	}
 
 	// -grid=WxH: the board size, each side 4 to 8 (for example -grid=5x7).
 	FString GridText;
@@ -503,6 +533,23 @@ void APuzzleGameMode::StartRound()
 	{
 		PuzzleManager->StartGame();
 	}
+	bPacketOpen = false;
+	BotPackets = 0;
+	if (TrickOrTreat)
+	{
+		TrickOrTreat->StartRound();
+		if (FParse::Param(FCommandLine::Get(), TEXT("treatpacket")))
+		{
+			Later(2.5f, [this]()
+			{
+				if (Flow == EPuzzleFlow::Playing && TrickOrTreat && !TrickOrTreat->IsAvailable())
+				{
+					TrickOrTreat->ForceArrival();
+					HandlePacketArrived();
+				}
+			});
+		}
+	}
 	if (InputHandler)
 	{
 		InputHandler->CancelInteraction();
@@ -551,7 +598,7 @@ void APuzzleGameMode::Retry()
 
 void APuzzleGameMode::OpenPauseMenu()
 {
-	if (Flow != EPuzzleFlow::Playing || bGameOver)
+	if (Flow != EPuzzleFlow::Playing || bGameOver || bPacketOpen)
 	{
 		return;
 	}
@@ -635,7 +682,7 @@ void APuzzleGameMode::SetOptions(bool bRelics, bool bBonusTiles)
 
 bool APuzzleGameMode::IsBoardInputEnabled() const
 {
-	return Flow == EPuzzleFlow::Playing && !bGameOver && !bAutoPlayEnabled && !bPauseMenuOpen;
+	return Flow == EPuzzleFlow::Playing && !bGameOver && !bAutoPlayEnabled && !bPauseMenuOpen && !bPacketOpen;
 }
 
 void APuzzleGameMode::RequestRelic(ERelic Relic)
@@ -698,6 +745,10 @@ void APuzzleGameMode::HandleCleared(const FPuzzleClearEvent& Event)
 			UI->ShowClear(Event);
 		}
 	});
+	if (TrickOrTreat && TrickOrTreat->CheckArrival())
+	{
+		HandlePacketArrived();
+	}
 }
 
 void APuzzleGameMode::HandleComboBroken(int32 LostCombo)
@@ -809,6 +860,152 @@ void APuzzleGameMode::HandleFinished()
 	}
 }
 
+// --- Trick-or-Treat packet ------------------------------------------------------
+
+void APuzzleGameMode::HandlePacketArrived()
+{
+	// It knocks once the clear that earned it has played out.
+	Later(AGridManager::ArriveDuration + 1.0f, [this]()
+	{
+		PlaySfx(RelicSound, 0.9f, 0.7f);
+		Haptic(0.4f, 0.25f);
+		if (UPuzzleHUDWidget* UI = GetUI())
+		{
+			UI->ShowPacketArrived();
+		}
+		if (bAutoPlayEnabled)
+		{
+			Later(1.6f, [this]() { BotOpenPacket(); });
+		}
+	});
+}
+
+void APuzzleGameMode::OpenPacket()
+{
+	if (!TrickOrTreat || !TrickOrTreat->IsAvailable() || Flow != EPuzzleFlow::Playing || bGameOver || bPauseMenuOpen)
+	{
+		return;
+	}
+	bPacketOpen = true;
+	if (InputHandler)
+	{
+		InputHandler->CancelInteraction();
+	}
+	PlaySfx(RelicSound, 0.8f, 0.9f);
+	if (UPuzzleHUDWidget* UI = GetUI())
+	{
+		UI->ShowCard(EPuzzleCard::Packet);
+	}
+}
+
+void APuzzleGameMode::ClosePacket()
+{
+	bPacketOpen = false;
+	if (UPuzzleHUDWidget* UI = GetUI())
+	{
+		UI->ShowCard(EPuzzleCard::None);
+	}
+}
+
+void APuzzleGameMode::ChooseTreat()
+{
+	if (bPacketOpen)
+	{
+		if (UPuzzleHUDWidget* UI = GetUI())
+		{
+			UI->ShowCard(EPuzzleCard::Treat);
+		}
+	}
+}
+
+void APuzzleGameMode::BuyTreat(int32 Offer)
+{
+	if (!bPacketOpen || !TrickOrTreat)
+	{
+		return;
+	}
+	TrickOrTreat->BuyTreat(Offer, [this, Offer](bool bSuccess)
+	{
+		if (!bSuccess)
+		{
+			return;
+		}
+		TrickOrTreat->Consume();
+		ClosePacket();
+		PlaySfx(HolySound, 0.8f, 1.2f);
+		Haptic(0.5f, 0.25f);
+		if (UPuzzleHUDWidget* UI = GetUI())
+		{
+			UI->ShowTreatBought(Offer);
+		}
+	});
+}
+
+void APuzzleGameMode::ChooseTrick()
+{
+	if (!bPacketOpen || !TrickOrTreat)
+	{
+		return;
+	}
+	TrickOrTreat->Consume();
+	const int32 Segment = TrickOrTreat->SpinTrick();
+	PlaySfx(RelicSound, 0.8f, 1.4f);
+	if (UPuzzleHUDWidget* UI = GetUI())
+	{
+		UI->ShowWheel(Segment);
+	}
+}
+
+void APuzzleGameMode::FinishTrick(int32 Segment)
+{
+	if (!TrickOrTreat)
+	{
+		return;
+	}
+	const bool bGood = UTrickOrTreat::IsGoodSegment(Segment);
+	const FString Line = TrickOrTreat->ApplyTrick(Segment);
+	PlaySfx(bGood ? HolySound : ComboLostSound, 0.9f, bGood ? 1.1f : 0.8f);
+	Shake(bGood ? 4.f : 9.f);
+	Haptic(bGood ? 0.4f : 0.8f, 0.3f);
+	if (UPuzzleHUDWidget* UI = GetUI())
+	{
+		UI->ShowTrickResult(Segment, Line);
+	}
+	Later(1.8f, [this]() { ClosePacket(); });
+}
+
+void APuzzleGameMode::BotOpenPacket()
+{
+	if (!bAutoPlayEnabled || !TrickOrTreat || !TrickOrTreat->IsAvailable())
+	{
+		return;
+	}
+	OpenPacket();
+	if (!bPacketOpen)
+	{
+		return;
+	}
+	FString Choice;
+	FParse::Value(FCommandLine::Get(), TEXT("treatchoice="), Choice);
+	const bool bTreat = Choice.Equals(TEXT("treat"), ESearchCase::IgnoreCase) || (!Choice.Equals(TEXT("trick"), ESearchCase::IgnoreCase) && BotPackets % 2 == 0);
+	++BotPackets;
+	Later(1.4f, [this, bTreat]()
+	{
+		if (bTreat)
+		{
+			ChooseTreat();
+			// -treatoffer=N: which offer the bot buys (default the first).
+			int32 Offer = 0;
+			FParse::Value(FCommandLine::Get(), TEXT("treatoffer="), Offer);
+			Later(1.8f, [this, Offer]() { BuyTreat(Offer); });
+		}
+		else
+		{
+			ChooseTrick();
+		}
+	});
+}
+
 // --- Auto-play ---------------------------------------------------------------
 
 void APuzzleGameMode::ToggleAutoPlay()
@@ -848,7 +1045,7 @@ void APuzzleGameMode::SetAutoPlay(bool bEnabled)
 
 void APuzzleGameMode::BotTick()
 {
-	if (bAutoPlayEnabled && BotPlayer && Flow == EPuzzleFlow::Playing && !bGameOver && !bPauseMenuOpen)
+	if (bAutoPlayEnabled && BotPlayer && Flow == EPuzzleFlow::Playing && !bGameOver && !bPauseMenuOpen && !bPacketOpen)
 	{
 		BotPlayer->TakeBestAction();
 	}

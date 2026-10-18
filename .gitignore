@@ -31,3 +31,7 @@ __pycache__/
 # Running backup of the dev conversation (Tools/dev_chat_sync.py)
 dev_chat.log
 .dev_chat_state.json
+
+# SSH keys must never be committed
+id_ed25519*
+*.pem

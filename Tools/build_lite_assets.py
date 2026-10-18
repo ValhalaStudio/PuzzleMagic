@@ -1,5 +1,6 @@
 # Imports the pictures of the lightweight (mobile) mode and builds its two cheap unlit materials:
 #   /Game/Lite/T_LiteBackdrop  (Tools/LiteArt/T_LiteBackdrop.png, rendered by the game with -backdropcapture)
+#   /Game/Lite/T_LiteBackdropClassic (T_LiteBackdropClassic.png: -backdropcapture -classic)
 #   /Game/Lite/T_LiteBat       (Tools/make_lite_sprites.py)
 #   /Game/Lite/T_LiteSteam     (Tools/make_lite_sprites.py)
 #   M_LiteBackdrop : opaque unlit picture
@@ -45,6 +46,7 @@ def import_texture(name, filename, is_backdrop):
 
 
 import_texture("T_LiteBackdrop", "T_LiteBackdrop.png", True)
+import_texture("T_LiteBackdropClassic", "T_LiteBackdropClassic.png", True)  # the Classic look: the same scene without the cauldrons
 import_texture("T_LiteBat", "T_LiteBat.png", False)
 import_texture("T_LiteSteam", "T_LiteSteam.png", False)
 

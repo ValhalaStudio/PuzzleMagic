@@ -1,5 +1,6 @@
 #include "HalloweenProps.h"
 #include "PuzzleLite.h"
+#include "PuzzleStyle.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -63,11 +64,14 @@ void AHalloweenProps::BeginPlay()
 	bLite = PuzzleLite::IsLite();
 	if (bLite)
 	{
-		BuildLite();
+		BuildLite(); // (in the Classic look this is only the picture, without cauldrons, bats or steam)
 		return;
 	}
 	RestoreAfterLite();
-	BuildAll();
+	if (!PuzzleStyle::IsClassic())
+	{
+		BuildAll();
+	}
 }
 
 void AHalloweenProps::BuildAll()
@@ -240,6 +244,10 @@ void AHalloweenProps::Tick(float DeltaTime)
 	{
 		TickLite(DeltaTime);
 		return;
+	}
+	if (PuzzleStyle::IsClassic())
+	{
+		return; // no cauldrons or bats to fit or animate
 	}
 	if (Time >= NextFitCheck)
 	{

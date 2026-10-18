@@ -14,7 +14,8 @@ Before you start
 - Nothing else may be using the engine: close the editor, any `-game` window and any other build. Two builds at once corrupt
   `Intermediate` (a corrupt `Definitions.PuzzleGame5x5.h` full of null characters is the sign; delete it).
 - A build takes about 20 minutes for Windows and 20 for Android; run it in the background and wait for it to finish.
-- Android needs the Android SDK, NDK `27.2.12479018` and JDK 21 (`ANDROID_HOME`, `NDKROOT`, `JAVA_HOME`).
+- Android needs the Android SDK, NDK `27.2.12479018` and JDK 21. The script finds JDK 21 itself (or take `-Jdk <folder>`) and does
+  not trust an existing `JAVA_HOME`: an old Java 8 there makes the Gradle APK step fail ("This build uses a Java 8 JVM").
 
 Known traps
 - The Android cook sometimes ends with an engine ensure ("MTAccessDetector") after printing "Done!" and exits 25: it is the engine,

@@ -43,6 +43,10 @@ public:
 	UPROPERTY()
 	int32 DisplayMode = -1;
 
+	// The Classic look (triangle tiles, the older bonus tiles, no Halloween props), a test option in Play options.
+	UPROPERTY()
+	bool bClassicLook = false;
+
 	// Phones and tablets: hold the screen upright (portrait) instead of sideways (landscape, the default).
 	UPROPERTY()
 	bool bPortrait = false;
