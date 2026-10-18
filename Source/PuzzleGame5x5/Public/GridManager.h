@@ -152,6 +152,11 @@ public:
 	void RefillTrayIfEmpty();
 	void ConsumeTraySlot(int32 SlotIndex);
 	void RerollTray();
+	// Trick-or-Treat: puts Piece in the hold slot (whatever was there is gone), with the reroll's ring.
+	void GiveReservePiece(const FPuzzlePieceShape& Piece);
+	// Trick-or-Treat's stray tile: a single random tile dropped on an empty cell where it clears nothing and
+	// leaves room for a tray piece. False when there is no such cell.
+	bool DropStrayTile(FIntPoint& OutCell);
 
 	// Curated tray (campaign steps): the player is dealt these buckets of pieces in order instead of random ones. Call it
 	// before InitBoard. Empty buckets mean random pieces.
