@@ -36,7 +36,8 @@ enum class EPuzzleCard : uint8
 	ArcadeIntro,  // the popup before a challenge
 	ArcadeOutro,  // the popup after a challenge is won
 	ArcadeFail,
-	ArcadeDone    // after the last challenge
+	ArcadeDone,   // after the last challenge
+	DemoDone      // the demo build: the score cap was reached
 };
 
 // Buttons never take keyboard focus, so game keys keep reaching the player controller after a click.
@@ -108,7 +109,7 @@ private:
 	// ActTutorial's Param is the page to show; -1 closes the tutorial.
 	enum EAction : int32
 	{
-		ActPlay, ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
+		ActPlay, ActPlayDemo, /* Param = the demo mode (1 or 2) */ ActRetry, ActMenu, ActHoly, ActReroll, ActHowTo, ActTutorial,
 		ActPause, ActResume, ActTakeOver, ActStartDemo, ActCourses, ActOptions, ActToggleRelics, ActToggleBonus, ActToggleGraphics, ActToggleScreen, ActToggleOrientation, ActToggleLook,
 		ActCourse,  // Param = width * 10 + height
 		ActExit,
@@ -125,6 +126,8 @@ private:
 	UMaterialInstanceDynamic* MakePanelMID(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f, float Pressed = 0.f);
 	UImage* MakePanel(const FLinearColor& Fill, const FLinearColor& Fill2, const FLinearColor& Rim, float Aspect, float Radius = 0.3f, float Glow = 0.f);
 	UImage* MakeIcon(float Shape, const FLinearColor& Color, float Size, float Fill = 1.f, float Glow = 0.f);
+	// The bonus tile symbols of the plain-tile themes as the tiles show them: Emblem 0 plain, 1 diamond, 2 ring (M_UIBonusIcon).
+	UImage* MakeBonusIcon(int32 Emblem, const FLinearColor& Color, float Size);
 	UButton* MakeButton(UWidget* Content, const FVector2D& Size, const FLinearColor& Fill, const FLinearColor& Fill2, int32 Action, int32 Param = 0);
 	UButton* MakeTextButton(const FString& Label, const FVector2D& Size, const FLinearColor& Fill, const FLinearColor& Fill2, int32 Action, int32 Param = 0);
 	UWidget* Sized(UWidget* Content, const FVector2D& Size);
@@ -157,6 +160,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> IconMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> BonusIconMaterial;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UPuzzleButtonProxy>> Proxies;

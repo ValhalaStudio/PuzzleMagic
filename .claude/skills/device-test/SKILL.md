@@ -30,7 +30,7 @@ Rules that cost hours to learn
   drifts by +-100 mA, as large as the effects, and the numbers are meaningless. Fix the brightness for the test.
 - Frame rate: `dumpsys SurfaceFlinger --latency "<layer>"`; the layer name differs between Android versions (try the `SurfaceView[...]` ones).
 - Touch drags lift the piece well above the finger; to place a piece by script, sweep release points and check the tray slot empties.
-- When a test is finished: `adb shell am force-stop com.YourCompany.PuzzleMagic` on every device, confirm with `pidof`, restore the
+- When a test is finished: `adb shell am force-stop com.valhallastudios.puzzlemagic` on every device, confirm with `pidof`, restore the
   settings you changed (timeout, brightness, rotation), clear `debug.puzzle.exec`, and tell the user what state you left each device in.
 - Test commands change the saved campaign progress on the device (not the best score); mention it.
 - Confirm that a device is the one you mean before changing its settings.

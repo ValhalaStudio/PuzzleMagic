@@ -64,11 +64,11 @@ void AHalloweenProps::BeginPlay()
 	bLite = PuzzleLite::IsLite();
 	if (bLite)
 	{
-		BuildLite(); // (in the Classic look this is only the picture, without cauldrons, bats or steam)
+		BuildLite(); // (without props this is only the picture, or nothing at all for a scene made of real geometry)
 		return;
 	}
 	RestoreAfterLite();
-	if (!PuzzleStyle::IsClassic())
+	if (PuzzleStyle::HasProps())
 	{
 		BuildAll();
 	}
@@ -245,7 +245,7 @@ void AHalloweenProps::Tick(float DeltaTime)
 		TickLite(DeltaTime);
 		return;
 	}
-	if (PuzzleStyle::IsClassic())
+	if (!PuzzleStyle::HasProps())
 	{
 		return; // no cauldrons or bats to fit or animate
 	}

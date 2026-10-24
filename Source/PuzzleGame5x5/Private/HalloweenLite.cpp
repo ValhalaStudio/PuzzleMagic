@@ -257,15 +257,16 @@ void AHalloweenProps::BuildLite()
 
 	UMaterialInterface* BackdropMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_LiteBackdrop.M_LiteBackdrop"));
 	UMaterialInterface* SpriteMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_LiteSprite.M_LiteSprite"));
-	// The Classic look has its own picture (the cathedral without the cauldrons) and no sprites.
-	const bool bClassicLook = PuzzleStyle::IsClassic();
-	UTexture2D* BackdropTexture = LoadObject<UTexture2D>(nullptr, bClassicLook ? TEXT("/Game/Lite/T_LiteBackdropClassic.T_LiteBackdropClassic") : TEXT("/Game/Lite/T_LiteBackdrop.T_LiteBackdrop"));
-	if (!BackdropTexture)
+	// Each cathedral theme has its own picture (a theme with props also has the bat and steam sprites); a scene made of real
+	// geometry (the desk) has no picture at all.
+	const FPuzzleThemeDef& Theme = PuzzleStyle::Current();
+	UTexture2D* BackdropTexture = Theme.LiteBackdrop ? LoadObject<UTexture2D>(nullptr, Theme.LiteBackdrop) : nullptr;
+	if (!BackdropTexture && Theme.LiteBackdrop)
 	{
 		BackdropTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBackdrop.T_LiteBackdrop"));
 	}
-	UTexture2D* BatTexture = bClassicLook ? nullptr : LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBat.T_LiteBat"));
-	UTexture2D* SteamTexture = bClassicLook ? nullptr : LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteSteam.T_LiteSteam"));
+	UTexture2D* BatTexture = Theme.bProps ? LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteBat.T_LiteBat")) : nullptr;
+	UTexture2D* SteamTexture = Theme.bProps ? LoadObject<UTexture2D>(nullptr, TEXT("/Game/Lite/T_LiteSteam.T_LiteSteam")) : nullptr;
 	if (!BackdropMaterial || !SpriteMaterial)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("HalloweenProps: lightweight materials are missing (run Tools/build_lite_assets.py)"));

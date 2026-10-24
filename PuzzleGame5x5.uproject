@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "Cartoon-fantasy 9x9 block puzzle (drag pieces, clear rows/columns/3x3 boxes) targeting iOS, with an auto-play demo mode.",
+	"Description": "Puzzle Magic: a route puzzle. Drag pieces onto the board and chain tiles into routes.",
 	"Modules": [
 		{
 			"Name": "PuzzleGame5x5",

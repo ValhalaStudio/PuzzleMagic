@@ -1,0 +1,368 @@
+{
+ "format": 1,
+ "kind": "captest",
+ "name": "Cap test",
+ "finale": "",
+ "steps": [
+  {
+   "title": "Cap test",
+   "goal": 5000,
+   "goalRoutes": 0,
+   "timeLimit": 0,
+   "grid": [
+    4,
+    4
+   ],
+   "relics": {
+    "holyLight": true,
+    "reroll": true
+   },
+   "bonus": {
+    "pumpkin": true,
+    "fullPotion": true,
+    "emptyPotion": true
+   },
+   "intro": "",
+   "outro": "",
+   "hint": "",
+   "board": [],
+   "tray": {
+    "after": "loop",
+    "buckets": [
+     [
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "right",
+        "right",
+        "right",
+        "right"
+       ],
+       "color": "purple"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "up",
+        "up",
+        "up",
+        "up"
+       ],
+       "color": "red"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "left",
+        "left",
+        "left",
+        "left"
+       ],
+       "color": "black"
+      }
+     ],
+     [
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "down",
+        "down",
+        "down",
+        "down"
+       ],
+       "color": "ash"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "right",
+        "right",
+        "right",
+        "right"
+       ],
+       "color": "purple"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "up",
+        "up",
+        "up",
+        "up"
+       ],
+       "color": "red"
+      }
+     ],
+     [
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "left",
+        "left",
+        "left",
+        "left"
+       ],
+       "color": "black"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "down",
+        "down",
+        "down",
+        "down"
+       ],
+       "color": "ash"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "right",
+        "right",
+        "right",
+        "right"
+       ],
+       "color": "purple"
+      }
+     ],
+     [
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "up",
+        "up",
+        "up",
+        "up"
+       ],
+       "color": "red"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         1,
+         0
+        ],
+        [
+         2,
+         0
+        ],
+        [
+         3,
+         0
+        ]
+       ],
+       "dirs": [
+        "left",
+        "left",
+        "left",
+        "left"
+       ],
+       "color": "black"
+      },
+      {
+       "cells": [
+        [
+         0,
+         0
+        ],
+        [
+         0,
+         1
+        ],
+        [
+         0,
+         2
+        ],
+        [
+         0,
+         3
+        ]
+       ],
+       "dirs": [
+        "down",
+        "down",
+        "down",
+        "down"
+       ],
+       "color": "ash"
+      }
+     ]
+    ]
+   }
+  }
+ ]
+}

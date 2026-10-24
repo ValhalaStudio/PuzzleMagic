@@ -3,6 +3,8 @@
 // the bonus tiles, can put tiles on the board and deal the player a fixed set of pieces, shows an intro popup, runs the
 // clock, and ends with an outro popup when its goals are met, or a fail popup when time runs out or no piece fits.
 #include "PuzzleGameMode.h"
+#include "PuzzleDemo.h"
+#include "PuzzleLocale.h"
 #include "CampaignData.h"
 #include "GridManager.h"
 #include "PuzzleManager.h"
@@ -15,13 +17,30 @@ namespace
 	const TCHAR* KindFileName[2] = { TEXT("arcade"), TEXT("tutorial") };
 }
 
+void APuzzleGameMode::PuzzleLang(const FString& Language)
+{
+	PuzzleLocale::SetOverride(Language);
+	Campaigns[1].Reset(); // the tutorial is loaded again in the new language
+	LoadCampaign();
+	ShowMenu();           // back to the menu, so the next how-to page or tutorial step is built in the new language
+	UE_LOG(LogTemp, Display, TEXT("PuzzleLang: Greek texts %s"), PuzzleLocale::IsGreek() ? TEXT("on") : TEXT("off"));
+}
+
 void APuzzleGameMode::LoadCampaign()
 {
 	for (int32 Kind = 0; Kind < 2; ++Kind)
 	{
 		if (!Campaigns[Kind].IsValid())
 		{
-			Campaigns[Kind] = FArcadeCampaign::Load(KindFileName[Kind]);
+			// The tutorial has a Greek copy (tutorial_el.json); with Greek off, or without the file, it is the English one.
+			if (Kind == 1 && PuzzleLocale::IsGreek())
+			{
+				Campaigns[Kind] = FArcadeCampaign::Load(TEXT("tutorial_el"));
+			}
+			if (!Campaigns[Kind].IsValid())
+			{
+				Campaigns[Kind] = FArcadeCampaign::Load(KindFileName[Kind]);
+			}
 		}
 	}
 }
@@ -195,6 +214,17 @@ void APuzzleGameMode::LeaveArcade()
 			GridManager->SetGridSize(SaveGame->CourseWidth, SaveGame->CourseHeight);
 			ReframeCamera();
 		}
+		if (PuzzleDemo::IsDemo())
+		{
+			// The demo has no course or option choice: back to the board and the options of the demo mode being played.
+			PuzzleManager->SetExtrasEnabled(true);
+			PuzzleManager->SetBonusTilesEnabled(PuzzleDemo::BonusTiles());
+			if (GridManager)
+			{
+				GridManager->SetGridSize(PuzzleDemo::BoardSize(), PuzzleDemo::BoardSize());
+				ReframeCamera();
+			}
+		}
 		StartRound();
 	}
 }
@@ -311,6 +341,9 @@ void APuzzleGameMode::PuzzleUiCard(const FString& What, int32 A, int32 B, int32 
 	else if (What == TEXT("courses"))   { UI->ShowCard(EPuzzleCard::Courses); }
 	else if (What == TEXT("options"))   { UI->ShowCard(EPuzzleCard::Options); }
 	else if (What == TEXT("pause"))     { UI->ShowCard(EPuzzleCard::Pause); }
+	else if (What == TEXT("theme"))     { SetTheme(PuzzleStyle::NextTheme(GetTheme())); } // what the options button does: next theme, saved, map reloaded
+	else if (What == TEXT("demo"))      { StartDemoGame(A); } // what the menu's DEMO 1 / DEMO 2 buttons do: PuzzleUiCard demo 1|2
+	else if (What == TEXT("demowin"))   { if (PuzzleDemo::IsDemo() && PuzzleManager) { PuzzleManager->Score = PuzzleDemo::ScoreCap(); CheckDemoCap(); } } // test: reach the demo cap
 	else if (What == TEXT("gameover"))  { UI->ShowCard(EPuzzleCard::GameOver); }
 	else if (What == TEXT("howto"))     { UI->ShowTutorial(A); }
 	else if (What == TEXT("arcademenu") && HasCampaign(A))

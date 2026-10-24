@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 ADB = os.path.join(os.environ["LOCALAPPDATA"], "Android", "Sdk", "platform-tools", "adb.exe")
-PKG = "com.YourCompany.PuzzleMagic"
+PKG = "com.valhallastudios.puzzlemagic"
 ACT = PKG + "/com.epicgames.unreal.GameActivity"
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -162,7 +162,7 @@ class Dev:
 
     def fps_sample(self):
         raw = self.adb("shell", "dumpsys", "SurfaceFlinger", "--list")
-        names = re.findall(r"SurfaceView\[com\.YourCompany\.PuzzleMagic/com\.epicgames\.unreal\.GameActivity\][^\s}]*", raw)
+        names = re.findall(r"SurfaceView\[com\.valhallastudios\.puzzlemagic/com\.epicgames\.unreal\.GameActivity\][^\s}]*", raw)
         names += [l.strip() for l in raw.splitlines() if "GameActivity" in l and "SurfaceView" in l and "{" not in l]
         for name in dict.fromkeys(names):
             out = self.adb("shell", "dumpsys", "SurfaceFlinger", "--latency", '"%s"' % name)

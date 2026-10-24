@@ -22,7 +22,7 @@
         "fullPotion": false,
         "emptyPotion": false
       },
-      "intro": "A ROUTE is a chain of hands, each pointing at the next, running from one side of the board to the far side. Drag the piece onto any row: its hands all point right, so it fills the row from the left edge to the right edge.",
+      "intro": "A ROUTE is a chain of tiles, each pointing at the next, running from one side of the board to the far side. Drag the piece onto any row: its tiles all point right, so it fills the row from the left edge to the right edge.",
       "outro": "That is a route! The whole chain breaks apart and scores.",
       "hint": "Drag the piece onto the board.",
       "board": [],
@@ -79,8 +79,8 @@
         "fullPotion": false,
         "emptyPotion": false
       },
-      "intro": "Two hands are already on the board, pointing right from the left edge. Complete the chain so it reaches the right edge.",
-      "outro": "A chain has to START on a hand at the edge that points away from it, and END on a hand at the far edge that points straight out.",
+      "intro": "Two tiles are already on the board, pointing right from the left edge. Complete the chain so it reaches the right edge.",
+      "outro": "A chain has to START on a tile at the edge that points away from it, and END on a tile at the far edge that points straight out.",
       "hint": "Fill the rest of the row.",
       "board": [
         {

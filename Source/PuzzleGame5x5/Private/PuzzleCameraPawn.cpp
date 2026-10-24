@@ -6,6 +6,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Misc/CommandLine.h"
 #include "PuzzleLite.h"
+#include "PuzzleStyle.h"
 #include "Misc/Parse.h"
 
 APuzzleCameraPawn::APuzzleCameraPawn()
@@ -83,7 +84,7 @@ void APuzzleCameraPawn::BeginPlay()
 	// Not on phones and tablets: this full-screen material does not compile for the mobile renderer, and the engine
 	// then paints its default grey-grid material over the whole screen.
 #if !(PLATFORM_ANDROID || PLATFORM_IOS)
-	if (InkOutlineMaterial && !PuzzleLite::IsLite()) // not in Low graphics
+	if (InkOutlineMaterial && !PuzzleLite::IsLite() && PuzzleStyle::InkOutline()) // not in Low graphics, nor in a theme without ink lines
 	{
 		PP.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, UMaterialInstanceDynamic::Create(InkOutlineMaterial, this)));
 	}

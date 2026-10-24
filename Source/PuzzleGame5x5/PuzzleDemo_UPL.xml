@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+The demo APK asks for no network or purchase permissions. The engine writes INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE and
+CHECK_LICENSE into every Android manifest (UEDeployAndroid.cs) and BILLING when in-app purchases are on; this removes them again (the engine's startup is patched so it copes without ACCESS_NETWORK_STATE).
+The game makes no network connections, takes no purchases and does no licence check. It is attached by PuzzleGame5x5.Build.cs only
+when the build runs with PUZZLE_DEMO=1 (Tools/build_packages.ps1 -DemoApk), so other builds keep the engine's manifest.
+Kept: WAKE_LOCK (the screen stays on while playing), VIBRATE (the haptics), MODIFY_AUDIO_SETTINGS (the music and effects).
+-->
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+	<init>
+		<log text="Puzzle demo: removing the network and purchase permissions"/>
+	</init>
+	<!-- The engine's own startup asks Android for the network state and crashes when ACCESS_NETWORK_STATE is missing: a patched copy of its
+	     network manager skips that instead (Android/NetworkChangedManager.java, the engine's file plus a try/catch and an "unavailable" flag). -->
+	<prebuildCopies>
+		<copyFile src="$S(PluginDir)/Android/NetworkChangedManager.java" dst="$S(BuildDir)/src/com/epicgames/unreal/network/NetworkChangedManager.java"/>
+	</prebuildCopies>
+	<!-- The engine's GameActivity also asks for the active network from the game thread: Tools/make_demo_activity.py writes a copy of its
+	     template with those two calls guarded, and this hands it to the build. -->
+	<gameActivityReplacement>
+		<setString result="Output" value="$S(ProjectDir)/Intermediate/PuzzleDemo/GameActivity.java.template"/>
+	</gameActivityReplacement>
+	<androidManifestUpdates>
+		<loopElements tag="uses-permission">
+			<setStringFromAttribute result="PermName" tag="$" name="android:name"/>
+			<setBoolIsEqual result="bInternet" arg1="$S(PermName)" arg2="android.permission.INTERNET"/>
+						<setBoolIsEqual result="bNetState" arg1="$S(PermName)" arg2="android.permission.ACCESS_NETWORK_STATE"/>
+			<setBoolIsEqual result="bWifiState" arg1="$S(PermName)" arg2="android.permission.ACCESS_WIFI_STATE"/>
+			<setBoolIsEqual result="bLicense" arg1="$S(PermName)" arg2="com.android.vending.CHECK_LICENSE"/>
+			<setBoolIsEqual result="bBilling" arg1="$S(PermName)" arg2="com.android.vending.BILLING"/>
+			<setBoolOr result="bDrop1" arg1="$B(bInternet)" arg2="$B(bNetState)"/>
+			<setBoolOr result="bDrop2" arg1="$B(bWifiState)" arg2="$B(bLicense)"/>
+			<setBoolOr result="bDrop3" arg1="$B(bDrop1)" arg2="$B(bDrop2)"/>
+			<setBoolOr result="bDrop" arg1="$B(bDrop3)" arg2="$B(bBilling)"/>
+			<if condition="bDrop">
+				<true>
+					<log text="Puzzle demo: removing permission $S(PermName)"/>
+					<removeElement tag="$"/>
+				</true>
+			</if>
+		</loopElements>
+	</androidManifestUpdates>
+</root>

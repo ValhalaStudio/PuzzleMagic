@@ -62,7 +62,7 @@ void APuzzleTile::PostInitializeComponents()
 
 	if (!TileMaterial)
 	{
-		TileMaterial = LoadObject<UMaterialInterface>(nullptr, PuzzleStyle::IsClassic() ? TEXT("/Game/Materials/M_TileRouteClassic.M_TileRouteClassic") : TEXT("/Game/Materials/M_TileRoute.M_TileRoute"));
+		TileMaterial = LoadObject<UMaterialInterface>(nullptr, PuzzleStyle::Current().RouteMaterial);
 	}
 	if (TileMaterial)
 	{
@@ -99,7 +99,7 @@ void APuzzleTile::SetBonus(EPuzzleBonus NewBonus)
 		// Loaded when needed, not from the constructor, so the asset can be rebuilt by the editor script.
 		if (!BonusMaterial)
 		{
-			BonusMaterial = LoadObject<UMaterialInterface>(nullptr, PuzzleStyle::IsClassic() ? TEXT("/Game/Materials/M_TileBonusClassic.M_TileBonusClassic") : TEXT("/Game/Materials/M_TileBonus.M_TileBonus"));
+			BonusMaterial = LoadObject<UMaterialInterface>(nullptr, PuzzleStyle::Current().BonusMaterial);
 		}
 		if (BonusMaterial)
 		{
@@ -127,13 +127,13 @@ void APuzzleTile::ApplyVisualState()
 	{
 		return;
 	}
-	const bool bClassic = PuzzleStyle::IsClassic();
+	const bool bClassic = !PuzzleStyle::HandTiles(); // the plain tiles (Desk, Classic): triangles and the older palette
 	DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), Bonus != EPuzzleBonus::None ? (bClassic ? PuzzleTypes::BonusToColor(Bonus) : PuzzleTypes::BonusBaseColor(Bonus)) : PuzzleTypes::ToLinearColor(TileColor));
 	DynamicMaterial->SetScalarParameterValue(TEXT("Shimmer"), Bonus != EPuzzleBonus::None ? (bClassic ? 1.f : 0.35f) : 0.f);
 	const bool bIsBonus = Bonus != EPuzzleBonus::None;
 	// Bonus tiles point nowhere and carry no sigil; their emblem (if any) tells the kind.
 	DynamicMaterial->SetScalarParameterValue(TEXT("Symbol"), bIsBonus ? -1.f : (bClassic ? PuzzleTypes::ClassicSymbolIndex(TileColor) : static_cast<float>(TileColor)));
-	// Halloween: pumpkin (basic) is emblem 2, potions emblem 1. Classic: diamond (outgoing) 1, fisheye (incoming) 2, basic plain 0.
+	// Halloween: pumpkin (basic) is emblem 2, potions emblem 1. Plain tiles: diamond (outgoing) 1, fisheye (incoming) 2, basic plain 0.
 	DynamicMaterial->SetScalarParameterValue(TEXT("Emblem"), bClassic ? (Bonus == EPuzzleBonus::Outgoing ? 1.f : (Bonus == EPuzzleBonus::Incoming ? 2.f : 0.f)) : (Bonus == EPuzzleBonus::Basic ? 2.f : (bIsBonus ? 1.f : 0.f)));
 	DynamicMaterial->SetScalarParameterValue(TEXT("Fill"), BonusFill);
 	DynamicMaterial->SetScalarParameterValue(TEXT("Direction"), (bHasDirection && !bIsBonus) ? static_cast<float>(TileDirection) : -1.f);
