@@ -96,6 +96,6 @@ GitHub shows `Architecture.html` as source code. Open it in a browser from a clo
 | FastNoise2 | 1.1.1 | MIT |
 | Cinzel Decorative and Lilita One fonts | | SIL Open Font License 1.1 |
 
-Their license texts are included with them.
+Their license texts are included with them. The original code and assets in this repository are released under CC0 1.0 (see LICENSE); the third-party components above keep their own licenses.
 
 The content tools were Python (NumPy, SciPy, DawDreamer with Faust, pedalboard), Blender 5.2, ComfyUI with Stable Diffusion 1.5 (DreamShaper 8), DeepBump and FFmpeg. `Tools/audio_fx.py` also expects Voxengo's free "St Nicolaes Church" impulse response in `D:\UEDeps\IR`. That file may not be redistributed, so it is not in this repository.

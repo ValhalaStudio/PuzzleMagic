@@ -16,7 +16,7 @@ namespace
 	// World layout, shared with the cathedral: the board sits at the origin on the floor plane, the camera stands on the +Y side
 	// and looks toward -Y, so things "behind the board" have negative Y.
 	constexpr float DeskTopZ = 0.6f;
-	constexpr float WallY = -2600.f;
+	constexpr float DeskWallY = -2600.f;
 }
 
 ADeskEnvironment::ADeskEnvironment()
@@ -84,7 +84,7 @@ void ADeskEnvironment::BeginPlay()
 
 		// A plain wall far behind the desk, so the top of the picture is never the void.
 		const FRotator FacingCamera = FRotationMatrix::MakeFromZX(FVector(0.f, 1.f, 0.f), FVector(1.f, 0.f, 0.f)).Rotator();
-		AddMesh(PlaneMesh, FTransform(FacingCamera, FVector(0.f, WallY, 1400.f), FVector(80.f, 30.f, 1.f)), PropMaterial(FLinearColor(0.20f, 0.19f, 0.18f), 1.f), false);
+		AddMesh(PlaneMesh, FTransform(FacingCamera, FVector(0.f, DeskWallY, 1400.f), FVector(80.f, 30.f, 1.f)), PropMaterial(FLinearColor(0.20f, 0.19f, 0.18f), 1.f), false);
 	}
 	BuildProps();
 

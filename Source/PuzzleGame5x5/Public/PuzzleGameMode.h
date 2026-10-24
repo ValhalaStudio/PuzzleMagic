@@ -13,6 +13,7 @@ class APuzzleHUD;
 class UPuzzleHUDWidget;
 class UPuzzleBotPlayer;
 class UPuzzleSaveGame;
+class UTrickOrTreat;
 class USoundBase;
 struct FPuzzleClearEvent;
 
@@ -53,6 +54,22 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
 	TObjectPtr<UPuzzleSaveGame> SaveGame;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
+	TObjectPtr<UTrickOrTreat> TrickOrTreat;
+
+	// --- The Trick-or-Treat packet (UTrickOrTreat): opened from its HUD button, then Treat (buy) or Trick (spin) ---
+	void OpenPacket();
+	// Closes the packet card; a packet that was neither bought nor spun stays for later.
+	void ClosePacket();
+	void ChooseTreat();
+	void BuyTreat(int32 Offer);
+	void ChooseTrick();
+	// Called by the wheel when it stops on Segment.
+	void FinishTrick(int32 Segment);
+
+	UPROPERTY(BlueprintReadOnly, Category = "Puzzle")
+	bool bPacketOpen = false;
 
 	// --- Flow: menu -> playing -> finished card ---
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
@@ -233,6 +250,10 @@ protected:
 	void HandleRelicGained(ERelic Relic);
 	void HandleBonusSpawned(FIntPoint Cell);
 	void HandleFinished();
+	void HandlePacketArrived();
+	// The bot opens the packet on its own: treat or trick (alternating, or -treatchoice=treat|trick).
+	void BotOpenPacket();
+	int32 BotPackets = 0;
 
 	void LoadCampaign();
 	void PrepareArcadeChallenge(bool bShowIntro);
