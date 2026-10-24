@@ -8,7 +8,7 @@ build **routes**. The UI is built in C++ (UMG, no Widget Blueprints). Read `READ
 - The designer wants to see each change working (screenshots) before it is committed. Commit only when asked; push only to the
   fork `fork` (`areklis/PuzzleMagic`). The upstream `origin` (ValhalaStudio) is never pushed to.
 - Never run two builds at once, and never a build while the editor or a game is open (corrupts `Intermediate`).
-- After testing on a phone or tablet, close the game (`adb shell am force-stop com.YourCompany.PuzzleMagic`) and leave the
+- After testing on a phone or tablet, close the game (`adb shell am force-stop com.valhallastudios.puzzlemagic`) and leave the
   device's settings as found. Never screenshot a whole PC desktop; capture only the game window.
 
 ## Rules (as implemented; the designer confirmed them)
@@ -35,10 +35,22 @@ every bucket is used up"). Code: `CampaignData.*` (parsing), `PuzzleArcade.cpp` 
 - The scenery pictures sit at depths that scale with the camera distance; a fixed depth once hid the board on a 20:9 phone.
 - Android Orientation must be the plain name (`Orientation=Sensor`); the `EAndroidScreenOrientation::` form silently becomes landscape.
   The options card has a Landscape/Portrait toggle (saved). `bUseExternalFilesDir=True` is needed for saves on Android 11+.
-- Classic look (Play options, saved, `-classic` flag): the Route puzzle MVP as before the Halloween theme (triangle tiles, older colours,
-  diamond/fisheye/plain bonus tiles, no cauldrons/bats/streams). `PuzzleStyle::IsClassic()` picks tile materials and colours; the low-spec
-  scene has its own backdrop `T_LiteBackdropClassic`. Materials come from `Tools/build_classic_*_tiles.py`.
+- Themes (Play options THEME button, saved, `-theme=desk|halloween|classic`): a table in `PuzzleStyle.h` (`FPuzzleThemeDef`), one entry per
+  theme. Desk (default): plain triangle tiles, graphite board, `ADeskEnvironment` (wood desk, mug, pencil, notebook; real geometry, so no
+  backdrop picture even in the lightweight mode). Halloween: skeleton hands, potions, cauldrons, bats, streams in the cathedral. Classic: the
+  pre-Halloween triangle tiles in the cathedral without props (`T_LiteBackdropClassic`). Changing theme reloads the map. To add a theme:
+  an `EPuzzleTheme` value, a table entry, and its scenery/materials (`Tools/build_desk_materials.py` is the pattern); `PuzzleUiCard theme` cycles it.
 - Card titles shrink to fit the frame and long text wraps in a 640-unit box: wrapped text draws about 15% wider than its box.
+
+## The demo build (Demo 1 / Demo 2)
+Same code, trimmed, switched on by `PuzzleDemo.h`: a `DemoBuild.txt` next to the packaged game, `-demobuild`, or `PUZZLE_DEMO=1` at build time
+(the demo APK). Menu: DEMO 1 (4x4, no bonus tiles, ends at 4000), DEMO 2 (7x7, bonus tiles, ends at 6000), TUTORIAL, PLAY OPTIONS, EXIT; Desk
+theme only; each mode keeps its own best. `-captest` (dev) brute-forces the cap with `Content/Campaigns/captest.json`. Greek text is picked from
+the system language (`PuzzleLocale.h`, `Content/Localization/el.json`, `tutorial_el.json`). Windows: `build_packages.ps1 -Demo` (Shipping,
+branded launcher that keeps saves in the game folder). Android: `-DemoApk` (Shipping; `PuzzleDemo_UPL.xml` drops the network/billing
+permissions). `-DemoDev` builds the same demo as a Development APK. The script clears an Android configuration when it flips between demo and
+full game: UnrealBuildTool does not see `PUZZLE_DEMO` change and would reuse the other kind's library. The demo tune `MUS_Demo` is not in the
+repository (licence): run `Tools/import_demo_music.py <mp3>` in the editor; without it the demo plays the organ piece only.
 
 ## Workflows (project skills in `.claude/skills/`, usable in any Claude Code session here)
 - `build-test-packages`: compile and build the Windows zip and the Android APK (`Tools/build_packages.ps1`, `Tools/package_windows.py`).

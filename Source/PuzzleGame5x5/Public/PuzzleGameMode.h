@@ -78,6 +78,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void StartEndless();
 
+	// Demo 1 (Mode 1: 4x4, no bonus tiles) or Demo 2 (Mode 2: 7x7, bonus tiles): sets the board and the options and starts a round.
+	void StartDemoGame(int32 Mode);
+	// Copies BestScore into the saved best of the demo mode being played (each mode keeps its own).
+	void SyncDemoBest();
+
 	UFUNCTION(BlueprintCallable, Category = "Puzzle")
 	void Retry();
 
@@ -187,6 +192,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	TObjectPtr<USoundBase> OrganMusicSound;
 
+	// The demo build's tune, played in place of the chant (Tools/import_demo_music.py imports it). A soft reference, so the package
+	// includes it and the game still runs where the asset is missing.
+	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
+	TSoftObjectPtr<USoundBase> DemoMusic;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Puzzle|Feedback")
 	float MusicVolume = 0.7f;
 
@@ -206,9 +216,9 @@ public:
 	int32 LastWindowMode = -1; // 1 fullscreen, 0 windowed; Tick watches it, since Alt+Enter and F11 change it too
 	void SetFullscreen(bool bFullscreen);
 
-	// The Classic look (a test option in Play options). Changing it reloads the map, which builds the scenery in the new look.
-	bool IsClassicLook() const;
-	void SetClassicLook(bool bClassic);
+	// The theme (Play options). Changing it reloads the map, which builds the tiles and the scenery in the new theme.
+	EPuzzleTheme GetTheme() const;
+	void SetTheme(EPuzzleTheme Theme);
 
 	// Phones and tablets: the Landscape / Portrait choice of the options card (locks the screen that way).
 	bool IsPortrait() const;
@@ -220,6 +230,11 @@ public:
 	// PuzzleHide <backdrop|bats|steam|board|light|ui> <0|1>   hides (1) or shows (0) that part of the scene.
 	UFUNCTION(Exec)
 	void PuzzleHide(const FString& What, int32 Hide);
+
+	// Dev command: the language of the instructions and the tutorial. PuzzleLang el | en | auto (auto = the system language). It applies to
+	// the next card that is opened. There is no such setting for the player.
+	UFUNCTION(Exec)
+	void PuzzleLang(const FString& Language);
 
 	// PuzzlePerf <max fps, 0 = no cap> <3D resolution in percent, 0 = leave> <1 = automatic resolution, 0 = fixed>
 	// Sets the frame cap and the render resolution of the lightweight scene in one go, for power measurements.
@@ -244,6 +259,8 @@ protected:
 	void PrepareArcadeChallenge(bool bShowIntro);
 	void LeaveArcade();
 	void CheckArcadeWin();
+	// The demo build ends a round at PuzzleDemo::ScoreCap() points with the demo-complete card.
+	void CheckDemoCap();
 	void FailArcade(const FString& Reason);
 
 	TSharedPtr<FArcadeCampaign> Campaigns[2];

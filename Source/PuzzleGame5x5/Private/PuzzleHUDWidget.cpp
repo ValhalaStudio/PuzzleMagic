@@ -1,4 +1,7 @@
 #include "PuzzleHUDWidget.h"
+#include "PuzzleStyle.h"
+#include "PuzzleDemo.h"
+#include "PuzzleLocale.h"
 #include "PuzzleGameMode.h"
 #include "PuzzleManager.h"
 #include "PuzzleInputHandler.h"
@@ -167,6 +170,27 @@ UImage* UPuzzleHUDWidget::MakeIcon(float Shape, const FLinearColor& Color, float
 	return Image;
 }
 
+UImage* UPuzzleHUDWidget::MakeBonusIcon(int32 Emblem, const FLinearColor& Color, float Size)
+{
+	if (!BonusIconMaterial)
+	{
+		return MakeIcon(UIStyle::IconStar, Color, Size, 1.f, 0.5f); // the generic star, if the material has not been built
+	}
+	UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(BonusIconMaterial, this);
+	MID->SetScalarParameterValue(TEXT("Emblem"), static_cast<float>(Emblem));
+	MID->SetVectorParameterValue(TEXT("Color"), Color);
+	MID->SetScalarParameterValue(TEXT("Glow"), 0.5f);
+
+	FSlateBrush Brush;
+	Brush.SetResourceObject(MID);
+	Brush.ImageSize = FVector2D(Size, Size);
+	Brush.DrawAs = ESlateBrushDrawType::Image;
+
+	UImage* Image = WidgetTree->ConstructWidget<UImage>();
+	Image->SetBrush(Brush);
+	return Image;
+}
+
 UWidget* UPuzzleHUDWidget::Sized(UWidget* Content, const FVector2D& Size)
 {
 	USizeBox* Box = WidgetTree->ConstructWidget<USizeBox>();
@@ -228,10 +252,14 @@ void UPuzzleHUDWidget::NativeOnInitialized()
 
 	PanelMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_UIPanel.M_UIPanel"));
 	IconMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_UIIcon.M_UIIcon"));
+	BonusIconMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/M_UIBonusIcon.M_UIBonusIcon"));
 
 	// Fonts ship as raw .ttf files (UI/Fonts is staged as UFS) and load lazily at runtime.
 	const FString FontDir = FPaths::ProjectContentDir() / TEXT("UI/Fonts");
-	BodyFont = MakeShared<FStandaloneCompositeFont>(TEXT("LilitaOne"), FontDir / TEXT("LilitaOne-Regular.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+	TSharedRef<FStandaloneCompositeFont> Body = MakeShared<FStandaloneCompositeFont>(TEXT("LilitaOne"), FontDir / TEXT("LilitaOne-Regular.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+	// Letters Lilita One lacks (Greek) fall back to a rounded face of about the same weight. It loads only when such a letter is drawn.
+	Body->FallbackTypeface.Typeface.AppendFont(TEXT("MPlusRounded"), FontDir / TEXT("MPLUSRounded1c-ExtraBold.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+	BodyFont = Body;
 	TitleFont = MakeShared<FStandaloneCompositeFont>(TEXT("CinzelDecorative"), FontDir / TEXT("CinzelDecorative-Black.ttf"), EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
 
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -622,8 +650,21 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 	{
 		Add(MakeText(TEXT("Puzzle"), true, 84.f, Gold, 6.f));
 		Add(MakeText(TEXT("Magic"), true, 108.f, Gold, 7.f), -30.f);
-		Add(MakeText(TEXT("a gothic block puzzle"), false, 32.f, Lavender, 3.f), -6.f);
+		Add(MakeText(PuzzleStyle::HasCathedral() ? TEXT("a gothic block puzzle") : TEXT("a route puzzle"), false, 32.f, Lavender, 3.f), -6.f);
 
+		if (PuzzleDemo::IsDemo())
+		{
+			// The demo: two buttons, Demo 1 (4x4, no bonus tiles, 4000) and Demo 2 (7x7, bonus tiles, 6000); the tutorial, options, exit.
+			Add(Btn(TEXT("DEMO 1"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActPlayDemo, 1), 36.f);
+			Add(Btn(TEXT("DEMO 2"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActPlayDemo, 2), 14.f);
+			if (GameMode && GameMode->HasCampaign(1))
+			{
+				Add(Btn(TEXT("TUTORIAL"), FVector2D(520.f, 100.f), Emerald, Emerald2, ActArcade, 1), 22.f);
+			}
+			Add(Btn(TEXT("PLAY OPTIONS"), FVector2D(520.f, 100.f), Amethyst, Amethyst2, ActOptions), 14.f);
+			Add(Btn(TEXT("EXIT"), FVector2D(520.f, 100.f), Ruby, Ruby2, ActExit), 14.f);
+			break;
+		}
 		Add(Btn(TEXT("PLAY"), FVector2D(560.f, 136.f), Emerald, Emerald2, ActPlay), 36.f);
 		const AGridManager* Board = GameMode ? GameMode->GridManager.Get() : nullptr;
 		Add(MakeText(FString::Printf(TEXT("course  %dx%d"), Board ? Board->GridWidth : 8, Board ? Board->GridHeight : 8), false, 30.f, Cyan, 3.f), 6.f);
@@ -692,10 +733,13 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 		const bool bRelics = Rules && Rules->bRelicsEnabled;
 		const bool bBonus = Rules && Rules->bBonusTilesEnabled;
 		Add(MakeText(TEXT("Play options"), true, 64.f, Gold, 5.f));
-		Add(Btn(FString::Printf(TEXT("RELICS  %s"), bRelics ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bRelics ? Emerald : Ruby, bRelics ? Emerald2 : Ruby2, ActToggleRelics), 40.f);
-		Add(MakeText(TEXT("combos, relics and luck"), false, 28.f, Lavender, 3.f), 6.f);
-		Add(Btn(FString::Printf(TEXT("BONUS TILES  %s"), bBonus ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bBonus ? Emerald : Ruby, bBonus ? Emerald2 : Ruby2, ActToggleBonus), 30.f);
-		Add(MakeText(TEXT("special tiles worth extra points"), false, 28.f, Lavender, 3.f), 6.f);
+		if (!PuzzleDemo::IsDemo())
+		{
+			Add(Btn(FString::Printf(TEXT("RELICS  %s"), bRelics ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bRelics ? Emerald : Ruby, bRelics ? Emerald2 : Ruby2, ActToggleRelics), 40.f);
+			Add(MakeText(TEXT("combos, relics and luck"), false, 28.f, Lavender, 3.f), 6.f);
+			Add(Btn(FString::Printf(TEXT("BONUS TILES  %s"), bBonus ? TEXT("ON") : TEXT("OFF")), FVector2D(620.f, 120.f), bBonus ? Emerald : Ruby, bBonus ? Emerald2 : Ruby2, ActToggleBonus), 30.f);
+			Add(MakeText(TEXT("special tiles worth extra points"), false, 28.f, Lavender, 3.f), 6.f);
+		}
 		// Graphics (a PC; a phone or tablet is always Low) and the window mode (PC only), side by side to keep the card short.
 		{
 			const bool bLow = GameMode && GameMode->IsLowGraphics();
@@ -711,10 +755,14 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 			Add(ButtonRow(GraphicsButton, ScreenButton), 28.f);
 #endif
 		}
-		// The Classic look: the Route puzzle MVP's triangle tiles and bonus symbols, without the Halloween scenery (test option).
+		// The theme: each press goes to the next one (Desk, Halloween, Classic, ...) and reloads the map. Not in the demo.
+		if (!PuzzleDemo::IsDemo())
 		{
-			const bool bClassicNow = GameMode && GameMode->IsClassicLook();
-			Add(Btn(bClassicNow ? TEXT("LOOK  CLASSIC") : TEXT("LOOK  HALLOWEEN"), FVector2D(440.f, 84.f), bClassicNow ? Amethyst : Emerald, bClassicNow ? Amethyst2 : Emerald2, ActToggleLook), 20.f);
+			const EPuzzleTheme ThemeNow = GameMode ? GameMode->GetTheme() : PuzzleStyle::GetTheme();
+			const bool bHalloween = ThemeNow == EPuzzleTheme::Halloween;
+			const bool bClassic = ThemeNow == EPuzzleTheme::Classic;
+			const FString ThemeLabel = FString::Printf(TEXT("THEME  %s"), PuzzleStyle::Defs(ThemeNow).Name);
+			Add(Btn(ThemeLabel, FVector2D(440.f, 84.f), bHalloween ? Ruby : (bClassic ? Amethyst : Emerald), bHalloween ? Ruby2 : (bClassic ? Amethyst2 : Emerald2), ActToggleLook), 20.f);
 		}
 		auto VolumeSlider = [this](float Value, bool bMusic) -> UWidget*
 		{
@@ -818,9 +866,9 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 				TArray<FString> Relics, Bonus;
 				if (Challenge->bHolyLight) { Relics.Add(FString::Printf(TEXT("Holy Light x%d"), Challenge->HolyLightCharges)); }
 				if (Challenge->bReroll) { Relics.Add(FString::Printf(TEXT("Reroll x%d"), Challenge->RerollCharges)); }
-				if (Challenge->bPumpkin) { Bonus.Add(TEXT("pumpkin")); }
-				if (Challenge->bOutgoingBottle) { Bonus.Add(TEXT("full potion")); }
-				if (Challenge->bIncomingBottle) { Bonus.Add(TEXT("empty potion")); }
+				if (Challenge->bPumpkin) { Bonus.Add(PuzzleStyle::HandTiles() ? TEXT("pumpkin") : TEXT("plain tile")); }
+				if (Challenge->bOutgoingBottle) { Bonus.Add(PuzzleStyle::HandTiles() ? TEXT("full potion") : TEXT("diamond")); }
+				if (Challenge->bIncomingBottle) { Bonus.Add(PuzzleStyle::HandTiles() ? TEXT("empty potion") : TEXT("ring")); }
 				const int32 Seconds = Challenge->TimeLimitSeconds;
 				TArray<FString> RuleLines;
 				if (Challenge->TargetScore > 0)
@@ -1022,6 +1070,27 @@ void UPuzzleHUDWidget::BuildCardContent(EPuzzleCard Card)
 			Sized(MakeTextButton(TEXT("PLAY AGAIN"), FVector2D(380.f, 124.f), Emerald, Emerald2, ActRetry), FVector2D(380.f, 124.f))), 50.f);
 		break;
 	}
+	case EPuzzleCard::DemoDone:
+	{
+		Add(MakeText(PuzzleDemo::Mode() == 1 ? TEXT("Demo 1 Complete") : TEXT("Demo 2 Complete"), true, 64.f, Gold, 6.f));
+		Add(MakeText(FString::Printf(TEXT("%d"), Rules ? Rules->Score : 0), false, 120.f, Gold, 7.f), 20.f);
+		if (GameMode && GameMode->bLastNewBest)
+		{
+			UTextBlock* NewBest = MakeText(TEXT("NEW BEST!"), false, 54.f, Cyan, 5.f);
+			NewBest->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+			CardStars.Add(NewBest);
+			Add(NewBest, 4.f);
+		}
+		else
+		{
+			Add(MakeText(FString::Printf(TEXT("best  %d"), Save ? Save->BestScore : 0), false, 38.f, PaleGold, 3.f), 4.f);
+		}
+		Add(MakeText(FString::Printf(TEXT("you reached %d points"), PuzzleDemo::ScoreCap()), false, 32.f, Lavender, 3.f), 12.f);
+		Add(MakeText(TEXT("thanks for playing"), false, 32.f, Cyan, 3.f), 6.f);
+		Add(ButtonRow(Sized(MakeTextButton(TEXT("MENU"), FVector2D(280.f, 124.f), Amethyst, Amethyst2, ActMenu), FVector2D(280.f, 124.f)),
+			Sized(MakeTextButton(TEXT("PLAY AGAIN"), FVector2D(380.f, 124.f), Emerald, Emerald2, ActRetry), FVector2D(380.f, 124.f))), 50.f);
+		break;
+	}
 	default:
 		break;
 	}
@@ -1068,6 +1137,10 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 		GameMode->SetAutoPlay(false);
 		GameMode->StartEndless();
 		break;
+	case ActPlayDemo:
+		GameMode->SetAutoPlay(false);
+		GameMode->StartDemoGame(Param);
+		break;
 	case ActRetry:   GameMode->Retry(); break;
 	case ActMenu:    GameMode->ShowMenu(); break;
 	case ActPause:   GameMode->OpenPauseMenu(); break;
@@ -1096,7 +1169,7 @@ void UPuzzleHUDWidget::HandleAction(int32 Action, int32 Param)
 		RefreshCard();
 		break;
 	case ActToggleLook:
-		GameMode->SetClassicLook(!GameMode->IsClassicLook()); // reloads the map
+		GameMode->SetTheme(PuzzleStyle::NextTheme(GameMode->GetTheme())); // reloads the map
 		break;
 	case ActToggleScreen:
 		GameMode->SetFullscreen(!GameMode->IsFullscreen());
@@ -1145,47 +1218,57 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 {
 	using namespace UIStyle;
 
-	struct FSign { float Shape; FLinearColor Color; const TCHAR* Label; };
-	struct FPage { const TCHAR* Title; TArray<FSign> Signs; const TCHAR* Body; };
+	struct FSign { float Shape; FLinearColor Color; FString Label; };
+	struct FPage { const TCHAR* Title; TArray<FSign> Signs; FString Body; };
 	TArray<FPage> Pages;
 	Pages.Add({ TEXT("The Rite"),
 	  { { IconLine, Cyan, TEXT("ROUTE") } },
-	  TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each hand pointing at the next. It must START on a tile at the edge pointing straight away from that side, and END on a tile at an edge pointing straight out of it.\n\n")
+	  PuzzleLocale::Text(TEXT("howto.rite"), TEXT("Drag a piece onto the board. Build a ROUTE: a chain of tiles, each hand pointing at the next. It must START on a tile at the edge pointing straight away from that side, and END on a tile at an edge pointing straight out of it.\n\n")
 	  TEXT("The whole chain breaks apart. A chain that leaves through the side it started from is a closed CIRCUIT: it scores nothing and costs one step of your combo.\n\n")
-	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.") });
+	  TEXT("The rite ends when no piece fits. The fourth slot is HOLD: park a piece there for later.")) });
 	if (UPuzzleManager::bMoveBudgetEnabled)
 	{
-		Pages.Last().Body = TEXT("Drag a piece from the tray onto the board. Fill a whole ROW or COLUMN and it breaks apart.\n\n")
-			TEXT("Every piece costs a move; clears win moves back. The rite ends when the moves run out, or when no piece can fit. The fourth tray slot is HOLD: park a piece there for later.");
+		Pages.Last().Body = PuzzleLocale::Text(TEXT("howto.rite.moves"), TEXT("Drag a piece from the tray onto the board. Fill a whole ROW or COLUMN and it breaks apart.\n\n")
+			TEXT("Every piece costs a move; clears win moves back. The rite ends when the moves run out, or when no piece can fit. The fourth tray slot is HOLD: park a piece there for later."));
 	}
 	const APuzzleGameMode* TutorialMode = GetGameMode();
 	const UPuzzleManager* TutorialRules = TutorialMode ? TutorialMode->PuzzleManager.Get() : nullptr;
 	if (TutorialRules && TutorialRules->bBonusTilesEnabled)
 	{
+		const bool bPlainTiles = !PuzzleStyle::HandTiles();
+		if (bPlainTiles)
+		{
+			// The symbols and the words match the tiles on the board: a plain glowing tile, a diamond and a ring.
+			Pages.Add({ TEXT("Bonus Tiles"),
+			  { { 100.f, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), PuzzleLocale::Text(TEXT("label.plain"), TEXT("PLAIN")) }, { 101.f, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), PuzzleLocale::Text(TEXT("label.diamond"), TEXT("DIAMOND")) }, { 102.f, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), PuzzleLocale::Text(TEXT("label.ring"), TEXT("RING")) } },
+			  PuzzleLocale::Text(TEXT("howto.bonus.plain"), TEXT("Tiles without an arrow appear as your score grows: a glowing PLAIN tile every 200 points, and a DIAMOND with a RING every 600. There are never more than 2 plain tiles, or 1 diamond or 1 ring, on the board.\n\n")
+			  TEXT("A PLAIN tile bursts when a chain of arrows joins it to a side. The diamond sends a chain out through any neighbour and the chain leaves through the board edge. The ring takes a chain arriving from any side, starting at a side. A plain tile is worth 25 points, the diamond and the ring 50, plus 2 for every tile of the chain. A chain from the diamond to the ring is worth 100.")) });
+		}
+		else
 		Pages.Add({ TEXT("Bonus Tiles"),
 		  { { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Basic), TEXT("BASIC") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Outgoing), TEXT("OUT") }, { IconStar, PuzzleTypes::BonusToColor(EPuzzleBonus::Incoming), TEXT("IN") } },
-		  TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 200 points, and a full potion (OUT) with an empty potion (IN) every 600. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
-		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A pumpkin is worth 25 points and a potion 50, plus 2 for every tile of the chain. A chain from the full potion to the empty one is worth 100.") });
+		  PuzzleLocale::Text(TEXT("howto.bonus.hands"), TEXT("Tiles without a skeleton hand appear as your score grows: a carved PUMPKIN (BASIC) every 200 points, and a full potion (OUT) with an empty potion (IN) every 600. There are never more than 2 pumpkins, or 1 full or 1 empty potion, on the board.\n\n")
+		  TEXT("A PUMPKIN bursts when a chain of hands joins it to a side. The full potion pours a chain out through any neighbour and empties as the chain leaves the board. The empty potion takes a chain arriving from any side, starting at a side, and fills. A pumpkin is worth 25 points and a potion 50, plus 2 for every tile of the chain. A chain from the full potion to the empty one is worth 100.")) });
 	}
 	if (TutorialRules && TutorialRules->bComboEnabled)
 	{
 		Pages.Add({ TEXT("Combos"),
 		  { { IconStar, PaleGold, TEXT("COMBO") } },
-		  TEXT("Clear routes on following moves to build a COMBO: your route points are multiplied by it. Several routes at once climb it faster.\n\n")
-		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.") });
+		  PuzzleLocale::Text(TEXT("howto.combos"), TEXT("Clear routes on following moves to build a COMBO: your route points are multiplied by it. Several routes at once climb it faster.\n\n")
+		  TEXT("The three stars are its lifeline: each move without a clear burns one. Every 3 combo steps grants a RELIC.")) });
 	}
 	if (TutorialRules && TutorialRules->bRelicsEnabled)
 	{
 		Pages.Add({ TEXT("Relics"),
 		  { { IconSun, Gold, TEXT("HOLY LIGHT") }, { IconReroll, Cyan, TEXT("REROLL") } },
-		  TEXT("HOLY LIGHT: tap the board to purge a 3x3 area. It scores nothing.\nREROLL: replace the whole tray with fresh pieces. It scores nothing.") });
+		  PuzzleLocale::Text(TEXT("howto.relics"), TEXT("HOLY LIGHT: tap the board to purge a 3x3 area. It scores nothing.\nREROLL: replace the whole tray with fresh pieces. It scores nothing.")) });
 	}
 	if (TutorialRules && TutorialRules->bLuckEnabled)
 	{
 		Pages.Add({ TEXT("Luck"),
 		  { { IconMoon, LuckGreen, TEXT("LUCK") } },
-		  TEXT("Every combo step gathers +6 LUCK. Relics spend it: Holy Light -20, Reroll -12.\n\n")
-		  TEXT("The candles burn with your luck. Let it die, and the things in the dark wake.") });
+		  PuzzleLocale::Text(TEXT("howto.luck"), TEXT("Every combo step gathers +6 LUCK. Relics spend it: Holy Light -20, Reroll -12.\n\n")
+		  TEXT("The candles burn with your luck. Let it die, and the things in the dark wake.")) });
 	}
 	if (TutorialRules && TutorialRules->bRelicsEnabled)
 	{
@@ -1217,7 +1300,7 @@ void UPuzzleHUDWidget::BuildTutorialPage()
 	{
 		const FSign& Sign = Page.Signs[Index];
 		UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>();
-		UImage* Icon = MakeIcon(Sign.Shape, Sign.Color, SignSize, 1.f, 0.5f);
+		UImage* Icon = Sign.Shape >= 100.f ? MakeBonusIcon(static_cast<int32>(Sign.Shape - 100.f), Sign.Color, SignSize) : MakeIcon(Sign.Shape, Sign.Color, SignSize, 1.f, 0.5f);
 		Icon->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
 		CardStars.Add(Icon); // springs in one after another, like result stars
 		Column->AddChildToVerticalBox(Icon)->SetHorizontalAlignment(HAlign_Center);

@@ -37,6 +37,12 @@ namespace BoardLayout
 	const FMarble SlotIndigo { FLinearColor(0.04f, 0.035f, 0.11f), FLinearColor(0.4f, 0.35f, 0.65f), 0.4f, 0.15f };
 	const FMarble SlotBurgundy { FLinearColor(0.09f, 0.015f, 0.03f), FLinearColor(0.55f, 0.25f, 0.3f), 0.4f, 0.15f };
 	// Rougher than the board so the key light doesn't flare off the tray.
+	// The Desk theme's plain graphite surfaces (no veins), the cells still alternating light and dark.
+	const FMarble DeskFrame { FLinearColor(0.045f, 0.047f, 0.05f), FLinearColor(0.045f, 0.047f, 0.05f), 0.f, 0.45f };
+	const FMarble DeskPanel { FLinearColor(0.02f, 0.022f, 0.025f), FLinearColor(0.02f, 0.022f, 0.025f), 0.f, 0.5f };
+	const FMarble DeskSlotLight { FLinearColor(0.085f, 0.088f, 0.095f), FLinearColor(0.085f, 0.088f, 0.095f), 0.f, 0.5f };
+	const FMarble DeskSlotDark { FLinearColor(0.055f, 0.058f, 0.064f), FLinearColor(0.055f, 0.058f, 0.064f), 0.f, 0.5f };
+	const FMarble DeskTray { FLinearColor(0.09f, 0.085f, 0.08f), FLinearColor(0.09f, 0.085f, 0.08f), 0.f, 0.55f };
 	const FMarble TrayStone { FLinearColor(0.025f, 0.022f, 0.03f), FLinearColor(0.4f, 0.3f, 0.15f), 0.3f, 0.6f };
 	const FLinearColor ReserveBezel(0.75f, 0.55f, 1.f);
 
@@ -149,7 +155,8 @@ void AGridManager::BuildBoardVisuals()
 	Frame.CornerRadius = 44.f;
 	Frame.Height = FrameHeight;
 	Frame.Bevel = 8.f;
-	AddSection(0, ToonMesh::BuildBlock(Frame), Marble(FrameStone));
+	const bool bPlain = PuzzleStyle::PlainBoard();
+	AddSection(0, ToonMesh::BuildBlock(Frame), Marble(bPlain ? DeskFrame : FrameStone));
 	AddSection(1, ToonMesh::BuildOutlineHull(Frame, 5.f), BezelMaterial);
 
 	ToonMesh::FBlockParams PanelBlock;
@@ -159,7 +166,7 @@ void AGridManager::BuildBoardVisuals()
 	PanelBlock.Bevel = 4.f;
 	ToonMesh::FBuffers PanelBuffers;
 	PanelBuffers.Append(ToonMesh::BuildBlock(PanelBlock), FVector(0.f, 0.f, FrameHeight));
-	AddSection(2, PanelBuffers, Marble(PanelMarble));
+	AddSection(2, PanelBuffers, Marble(bPlain ? DeskPanel : PanelMarble));
 
 	// All 64 slots merged into two sections (a checkerboard).
 	ToonMesh::FBlockParams Slot;
@@ -181,8 +188,8 @@ void AGridManager::BuildBoardVisuals()
 			(bLightSlot ? LightSlots : DarkSlots).Append(SlotBlock, Offset);
 		}
 	}
-	AddSection(3, LightSlots, Marble(SlotIndigo));
-	AddSection(4, DarkSlots, Marble(SlotBurgundy));
+	AddSection(3, LightSlots, Marble(bPlain ? DeskSlotLight : SlotIndigo));
+	AddSection(4, DarkSlots, Marble(bPlain ? DeskSlotDark : SlotBurgundy));
 
 	ToonMesh::FBlockParams TrayBlock;
 	TrayBlock.HalfExtent = FVector2D(TrayPanelHalf, TrayPanelHalf);
@@ -203,7 +210,7 @@ void AGridManager::BuildBoardVisuals()
 		TrayBodies.Append(TrayBody, Offset);
 		(SlotIndex == ReserveSlot ? ReserveHull : TrayHulls).Append(TrayHull, Offset);
 	}
-	AddSection(5, TrayBodies, Marble(TrayStone));
+	AddSection(5, TrayBodies, Marble(bPlain ? DeskTray : TrayStone));
 	AddSection(6, TrayHulls, BezelMaterial);
 
 	// The reserve slot gets a violet-silver bezel so it reads as different from the three pieces.
@@ -701,8 +708,8 @@ void AGridManager::PopCells(const TArray<int32>& Indices, const FVector2D& Centr
 		}
 		// A bonus tile plays its own clear first (potion drains or fills, pumpkin swells), then bursts.
 		const bool bBonusTile = BonusKind != EPuzzleBonus::None;
-		// (the Classic look has no such animation: a bonus tile pops like any other)
-		const bool bBonusAnim = bBonusTile && !PuzzleStyle::IsClassic();
+		// (themes without props have no such animation: a bonus tile pops like any other)
+		const bool bBonusAnim = bBonusTile && PuzzleStyle::HasProps();
 		const float BurstDelay = PopDelay + (bBonusAnim ? 0.9f : 0.f);
 		if (bBonusAnim)
 		{
@@ -1059,8 +1066,8 @@ FClearResult AGridManager::CheckAndClearLines(float ClearDelay)
 			}
 			FX->AddStream(Points, Color, ClearDelay, FlowSpeed);
 		};
-		// The glowing streams along a cleared route belong to the Halloween look.
-		if (!PuzzleStyle::IsClassic())
+		// The glowing streams along a cleared route belong to the themes with props (Halloween).
+		if (PuzzleStyle::HasProps())
 		{
 			for (const FRouteInfo& Info : Routes)
 			{

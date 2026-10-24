@@ -28,6 +28,18 @@ public class PuzzleGame5x5 : ModuleRules
 			"Json"
 		});
 
+		// The demo build: PUZZLE_DEMO=1 in the environment of the build (Tools/build_packages.ps1 -DemoApk sets it) compiles the game as
+		// the demo. A phone has no loose marker file like the Windows demo's DemoBuild.txt (see PuzzleDemo.h).
+		if (System.Environment.GetEnvironmentVariable("PUZZLE_DEMO") == "1")
+		{
+			PublicDefinitions.Add("PUZZLE_DEMO_BUILD=1");
+			if (Target.Platform == UnrealTargetPlatform.Android)
+			{
+				// The demo APK asks for no network or purchase permissions (the engine adds them to every manifest).
+				AdditionalPropertiesForReceipt.Add("AndroidPlugin", System.IO.Path.Combine(ModuleDirectory, "PuzzleDemo_UPL.xml"));
+			}
+		}
+
 		// FastNoise2 is prebuilt for Win64 only (an iOS build of it needs a Mac); elsewhere the
 		// game falls back to FMath::PerlinNoise.
 		if (Target.Platform == UnrealTargetPlatform.Win64)

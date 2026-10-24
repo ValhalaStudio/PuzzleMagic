@@ -487,8 +487,14 @@ CLASSES = [
 
     ("AHalloweenProps", "atmos", "Halloween scenery beside the board: two iron cauldrons of bubbling lime-green liquid with steam and a flickering green glow, and bats that circle above them or cross the top of the scene. On phones and tablets (or with -lite) it is replaced by the lightweight mode: a pre-rendered backdrop picture and flat bat and steam sprites riding on the camera, plus a resolution controller that holds about 30 frames a second.", False),
     ("AGothicEnvironment", "atmos", "The cathedral around the board and its moods: wall, stained glass, Blender-made piers, candles, flagstones, ambient storms, and the Lovecraftian layer. Dread (low luck) drives breathing and stuttering light, tentacles, eyes, fog, motes, the madness post-process, the MetaSound ambience and the convolution reverb.", False),
-    ("PuzzleStyle", "atmos", "IsClassic(): the Classic look (Route puzzle MVP: triangle tiles, older colours and bonus symbols, no Halloween props or streams), a Play options test option that reloads the map.", False),
+    ("EPuzzleTheme", "atmos", "The themes: Desk (default), Halloween, Classic. Saved as a number; add a value and a table entry for a new one.", False),
+    ("EPuzzleScenery", "atmos", "Which scenery a theme builds: the cathedral (AGothicEnvironment) or the desk (ADeskEnvironment).", False),
+    ("FPuzzleThemeDef", "atmos", "One theme: id, button name, tile materials, hand tiles, props, plain board, scenery and lightweight backdrop.", False),
+    ("PuzzleStyle", "atmos", "The theme table (Desk, Halloween, Classic): per theme the tile materials, hand or plain tiles, props, plain board, scenery and the lightweight backdrop. Chosen in Play options (saved, reloads the map) or with -theme=; adding a theme is one entry here.", False),
+    ("ADeskEnvironment", "atmos", "The Desk theme's scenery: plank-wood desk top (M_DeskWood), a plain wall, a mug, pencil and notebook (M_DeskProp), soft daylight and the board key light. Real geometry, so no pre-rendered picture is needed in the lightweight mode.", False),
     ("PuzzleLite", "atmos", "IsLite(): whether the lightweight scene is used (phones and tablets, or -lite on a PC; on Android debug.puzzle.lite 0 turns it off for comparisons).", False),
+    ("PuzzleDemo", "atmos", "The demo build's switch and modes (header only): on with a DemoBuild.txt, -demobuild or PUZZLE_DEMO at build time; Demo 1 is 4x4 without bonus tiles ending at 4000 points, Demo 2 is 7x7 with bonus tiles ending at 6000. -captest (dev) brute-forces the cap.", False),
+    ("PuzzleLocale", "atmos", "Greek text for the how-to pages and the tutorial, picked from the system language (header only; Content/Localization/el.json). Terms and the big titles stay English; no toggle in the UI.", False),
     ("EldritchNoise", "atmos", "Fractal noise for organic shapes and light: FastNoise2 SIMD on Windows, FMath::PerlinNoise elsewhere.", False),
 ]
 
@@ -518,7 +524,8 @@ RELATIONS = [
     ("APuzzleGameMode", "UPuzzleManager", "own", "creates the rules", [(GM, r"NewObject<UPuzzleManager>")]),
     ("APuzzleGameMode", "AGridManager", "own", "spawns the board", [(GM, r"SpawnActor<AGridManager>")]),
     ("APuzzleGameMode", "APuzzleInputHandler", "own", "spawns", [(GM, r"SpawnActor<APuzzleInputHandler>")]),
-    ("APuzzleGameMode", "AGothicEnvironment", "own", "spawns", [(GM, r"SpawnActor<AGothicEnvironment>")]),
+    ("APuzzleGameMode", "AGothicEnvironment", "own", "spawns (cathedral themes)", [(GM, r"SpawnActor<AGothicEnvironment>")]),
+    ("APuzzleGameMode", "ADeskEnvironment", "own", "spawns (Desk theme)", [(GM, r"SpawnActor<ADeskEnvironment>")]),
     ("APuzzleGameMode", "AHalloweenProps", "own", "spawns", [(GM, r"SpawnActor<AHalloweenProps>")]),
     ("APuzzleGameMode", "UPuzzleBotPlayer", "own", "creates · TakeBestAction", [(GM, r"NewObject<UPuzzleBotPlayer>"), (GM, r"BotPlayer->TakeBestAction")]),
     ("APuzzleGameMode", "FArcadeCampaign", "call", "loads arcade.json and tutorial.json", [("PuzzleArcade.cpp", r"FArcadeCampaign::Load")]),
@@ -565,7 +572,8 @@ FLAG_TEXT = {
     "tutorialpage": "Open How to Play at page N (0-based).",
     "dread": "Hold dread at X or above, 0 to 1. For testing and recordings.",
     "grid": "Board size, each side 4 to 8, for example 5x7.",
-    "classic": "Forces the Classic look (triangle tiles, older bonus symbols, no Halloween props); the Play options button does the same and is saved. With -backdropcapture it renders the Classic backdrop.",
+    "classic": "Short form of -theme=classic. With -backdropcapture it renders the Classic backdrop picture.",
+    "theme": "Forces a theme by id (desk, halloween, classic); the Play options THEME button does the same and is saved. With -backdropcapture it renders a cathedral theme's backdrop picture.",
     "backdropcapture": "PC only: ten seconds in, hide the board, tiles and interface, save a 1920x1080 shot (Saved/Screenshots) and quit. Renders the lightweight mode's backdrop picture (use with -demo -grid=8x8).",
     "recordaudio": "Record the game's audio mix for N seconds to Saved/Recording/demo_audio.wav, then quit.",
 }
@@ -574,8 +582,13 @@ FLAG_ARG = {"grid": "=WxH", "tutorialpage": "=N", "dread": "=X", "recordaudio": 
 
 SCRIPTS = [
     ("build_classic_route_tiles.py", "Unreal editor Python", "M_TileRouteClassic: the Classic look's tile material with a triangle on every tile (the Route puzzle MVP's version of build_route_tiles.py)."),
-    ("build_classic_bonus_tiles.py", "Unreal editor Python", "M_TileBonusClassic: the Classic look's bonus tiles (diamond outgoing, fisheye incoming, plain basic)."),
+    ("build_classic_bonus_tiles.py", "Unreal editor Python", "M_TileBonusClassic: the plain bonus tiles of the Classic and Desk themes (diamond outgoing, fisheye incoming, plain basic)."),
+    ("build_desk_materials.py", "Unreal editor Python", "M_DeskWood (plank wood from the world position) and M_DeskProp (plain lit colour) for the Desk theme's scenery."),
     ("build_packages.ps1", "PowerShell", "Compiles the editor target and builds the Windows and Android test packages (finds the engine, retries a failed cook, zips Windows)."),
+    ("brand_exe.py", "Python", "Stamps the real name, company, copyright and icon into a Windows exe (the engine labels every game exe UnrealGame / Epic Games); used for the demo."),
+    ("build_bonus_icons.py", "Unreal editor Python", "M_UIBonusIcon: a UI material that draws the three plain-tile bonus symbols (basic, outgoing diamond, incoming fisheye) for the help pages, so they match the tiles."),
+    ("import_demo_music.py", "Unreal editor Python", "Imports an mp3 as /Game/Audio/MUS_Demo, the demo's background tune (not kept in the repository)."),
+    ("make_demo_activity.py", "Python", "Writes a copy of the engine's GameActivity template that copes with a missing ACCESS_NETWORK_STATE permission (the demo APK drops it); fails if the engine text differs."),
     ("package_windows.py", "Python", "Zips a packaged Windows build with forward-slash paths, the campaign editor and the starter campaigns."),
     ("dev_chat_sync.py", "Python", "Appends the new messages of the Claude Code conversation to dev_chat.log in the project folder (a readable progress log kept for the designer; git-ignored)."),
     ("arcane_head.py", "Unreal editor Python", "Shared helpers for the material scripts: create or rebuild a material, custom HLSL nodes, parameters, and the NOISE and SYMBOLS HLSL libraries."),

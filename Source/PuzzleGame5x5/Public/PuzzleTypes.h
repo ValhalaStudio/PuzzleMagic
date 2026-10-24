@@ -93,7 +93,7 @@ namespace PuzzleTypes
 	// The colour of a bonus kind's effects and popups: pumpkin orange, potion magenta.
 	inline FLinearColor BonusToColor(EPuzzleBonus Kind)
 	{
-		if (PuzzleStyle::IsClassic())
+		if (!PuzzleStyle::HandTiles())
 		{
 			switch (Kind)
 			{
@@ -153,7 +153,7 @@ namespace PuzzleTypes
 	// (Red blood drop, Green skull, Blue moon, Yellow cross, Purple bat).
 	inline FLinearColor ToLinearColor(EPuzzleTileColor Color)
 	{
-		if (PuzzleStyle::IsClassic())
+		if (!PuzzleStyle::HandTiles())
 		{
 			// The older palette, on the four colours the game has now (the old yellow is gone): blue, purple, red, green.
 			switch (Color)

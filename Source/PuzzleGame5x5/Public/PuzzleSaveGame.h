@@ -15,6 +15,13 @@ public:
 	UPROPERTY()
 	int32 BestScore = 0;
 
+	// The demo build keeps a best score for each of its two modes (BestScore is the one of the mode being played).
+	UPROPERTY()
+	int32 DemoBest1 = 0;
+
+	UPROPERTY()
+	int32 DemoBest2 = 0;
+
 	// The course (board size) and the play options picked in the menus.
 	UPROPERTY()
 	int32 CourseWidth = 8;
@@ -43,9 +50,9 @@ public:
 	UPROPERTY()
 	int32 DisplayMode = -1;
 
-	// The Classic look (triangle tiles, the older bonus tiles, no Halloween props), a test option in Play options.
+	// The theme (EPuzzleTheme as a number: 0 Desk, 1 Halloween, 2 Classic), chosen in Play options.
 	UPROPERTY()
-	bool bClassicLook = false;
+	uint8 Theme = 0;
 
 	// Phones and tablets: hold the screen upright (portrait) instead of sideways (landscape, the default).
 	UPROPERTY()

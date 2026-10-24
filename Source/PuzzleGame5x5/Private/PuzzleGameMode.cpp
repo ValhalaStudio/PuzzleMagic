@@ -10,9 +10,13 @@
 #include "PuzzleTile.h"
 #include "PuzzleSaveGame.h"
 #include "GothicEnvironment.h"
+#include "DeskEnvironment.h"
 #include "HalloweenProps.h"
 #include "PuzzleLite.h"
 #include "PuzzleStyle.h"
+#include "PuzzleDemo.h"
+#include "PuzzleLocale.h"
+#include "Misc/PackageName.h"
 #include "TrickOrTreat.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/GameUserSettings.h"
@@ -58,6 +62,7 @@ APuzzleGameMode::APuzzleGameMode()
 	RelicSound = RelicFinder.Object;
 	ComboLostSound = ComboLostFinder.Object;
 	MusicSound = MusicFinder.Object;
+	DemoMusic = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/Audio/MUS_Demo.MUS_Demo")));
 }
 
 void APuzzleGameMode::StartAudioRecording(float Seconds)
@@ -81,29 +86,46 @@ void APuzzleGameMode::StartAudioRecording(float Seconds)
 void APuzzleGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
+	PuzzleDemo::Detect();
+	PuzzleLocale::Detect();
 	// Before the camera pawn and the scenery are made: they choose their effects by this.
 	if (UPuzzleSaveGame* Early = UPuzzleSaveGame::LoadOrCreate())
 	{
 		PuzzleLite::SetLowGraphics(Early->bLowGraphics && !PuzzleLite::IsMobile());
-		// -classic forces the Classic look (also used to render its backdrop picture with -backdropcapture).
-		PuzzleStyle::SetClassic(Early->bClassicLook || FParse::Param(FCommandLine::Get(), TEXT("classic")));
+		// -theme=<id> forces a theme (also used to render a cathedral theme's backdrop picture with -backdropcapture); -classic is
+		// kept as a short form.
+		EPuzzleTheme Theme = static_cast<EPuzzleTheme>(FMath::Min<int32>(Early->Theme, static_cast<int32>(EPuzzleTheme::Count) - 1));
+		FString ThemeId;
+		if (FParse::Value(FCommandLine::Get(), TEXT("theme="), ThemeId))
+		{
+			PuzzleStyle::FindTheme(ThemeId, Theme);
+		}
+		else if (FParse::Param(FCommandLine::Get(), TEXT("classic")))
+		{
+			Theme = EPuzzleTheme::Classic;
+		}
+		if (PuzzleDemo::IsDemo())
+		{
+			Theme = EPuzzleTheme::Desk; // the demo has the Desk theme only
+		}
+		PuzzleStyle::SetTheme(Theme);
 	}
 }
 
-bool APuzzleGameMode::IsClassicLook() const
+EPuzzleTheme APuzzleGameMode::GetTheme() const
 {
-	return PuzzleStyle::IsClassic();
+	return PuzzleStyle::GetTheme();
 }
 
-void APuzzleGameMode::SetClassicLook(bool bClassic)
+void APuzzleGameMode::SetTheme(EPuzzleTheme Theme)
 {
-	if (!SaveGame || (SaveGame->bClassicLook == bClassic && PuzzleStyle::IsClassic() == bClassic))
+	if (PuzzleDemo::IsDemo() || !SaveGame || (SaveGame->Theme == static_cast<uint8>(Theme) && PuzzleStyle::GetTheme() == Theme))
 	{
 		return;
 	}
-	SaveGame->bClassicLook = bClassic;
+	SaveGame->Theme = static_cast<uint8>(Theme);
 	SaveGame->Save();
-	PuzzleStyle::SetClassic(bClassic);
+	PuzzleStyle::SetTheme(Theme);
 	// Tile materials and the scenery are chosen when the map starts, so it is loaded again.
 	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
 }
@@ -206,6 +228,10 @@ void APuzzleGameMode::StartPlay()
 		{
 			SetFullscreen(SaveGame->DisplayMode == 1);
 		}
+		else if (SaveGame->DisplayMode < 0 && !PuzzleLite::IsMobile() && PuzzleDemo::IsDemo())
+		{
+			SetFullscreen(false); // the demo's first run is in a window (the Play options button changes it, and that is saved)
+		}
 	}
 	PuzzleManager = NewObject<UPuzzleManager>(this);
 	LoadCampaign();
@@ -216,19 +242,60 @@ void APuzzleGameMode::StartPlay()
 		SpawnParams.Owner = this;
 		GridManager = GetWorld()->SpawnActor<AGridManager>(GridManagerClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 		InputHandler = GetWorld()->SpawnActor<APuzzleInputHandler>(InputHandlerClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-		Environment = GetWorld()->SpawnActor<AGothicEnvironment>(AGothicEnvironment::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		// The scenery belongs to the theme (the props actor also runs the lightweight mode's frame-rate control, so it is always there).
+		if (PuzzleStyle::HasCathedral())
+		{
+			Environment = GetWorld()->SpawnActor<AGothicEnvironment>(AGothicEnvironment::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		}
+		else
+		{
+			GetWorld()->SpawnActor<ADeskEnvironment>(ADeskEnvironment::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		}
 		GetWorld()->SpawnActor<AHalloweenProps>(AHalloweenProps::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 	}
 
 	if (GridManager)
 	{
 		PuzzleManager->BindToGrid(GridManager);
-		if (SaveGame)
+		if (PuzzleDemo::IsDemo())
+		{
+			GridManager->SetGridSize(PuzzleDemo::BoardSize(), PuzzleDemo::BoardSize());
+		}
+		else if (SaveGame)
 		{
 			GridManager->SetGridSize(SaveGame->CourseWidth, SaveGame->CourseHeight);
 		}
+		if (PuzzleDemo::IsCapTest())
+		{
+			// The cap test is data: board and tray come from a one-step campaign, the way the arcade deals its pieces.
+			const TSharedPtr<FArcadeCampaign> Test = FArcadeCampaign::Load(TEXT("captest"));
+			if (Test.IsValid() && Test->Challenges.Num() > 0)
+			{
+				const FArcadeChallenge& Step = Test->Challenges[0];
+				GridManager->SetGridSize(Step.GridWidth, Step.GridHeight);
+				GridManager->SetCuratedTray(Step.Buckets, Step.TrayAfter, Step.RerollBuckets, Step.RerollAfter);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("-captest: Content/Campaigns/captest.json is missing or unreadable"));
+			}
+		}
 	}
-	if (SaveGame)
+	if (PuzzleDemo::IsDemo())
+	{
+		// The demo always shows relics and luck; the bonus tiles are Demo 2's.
+		PuzzleManager->SetExtrasEnabled(true);
+		PuzzleManager->SetBonusTilesEnabled(PuzzleDemo::BonusTiles());
+		if (SaveGame)
+		{
+			if (SaveGame->DemoBest2 == 0 && SaveGame->BestScore > 0 && PuzzleDemo::Mode() == 2)
+			{
+				SaveGame->DemoBest2 = SaveGame->BestScore; // an older demo save had the one best, from the 7x7 round
+			}
+			SaveGame->BestScore = PuzzleDemo::Mode() == 1 ? SaveGame->DemoBest1 : SaveGame->DemoBest2;
+		}
+	}
+	else if (SaveGame)
 	{
 		PuzzleManager->SetExtrasEnabled(SaveGame->bOptionRelics);
 		PuzzleManager->SetBonusTilesEnabled(SaveGame->bOptionBonusTiles);
@@ -346,7 +413,7 @@ void APuzzleGameMode::StartPlay()
 	{
 		StartAudioRecording(RecordSeconds);
 	}
-	if (FParse::Param(CommandLine, TEXT("demo")))
+	if (FParse::Param(CommandLine, TEXT("demo")) || PuzzleDemo::IsCapTest())
 	{
 		StartEndless();
 		SetAutoPlay(true);
@@ -484,9 +551,25 @@ void APuzzleGameMode::PlayNextTrack()
 	// Loop lengths of the synthesized tracks (their wave assets loop, so the engine reports no duration).
 	// Gain evens out their loudness (the mastered organ piece is ~3 dB hotter than the chant).
 	struct FTrack { USoundBase* Sound; float Seconds; float Gain; };
-	const FTrack Playlist[] = { { MusicSound, 106.f * 2.f, 1.f }, { OrganMusicSound, 64.f, 0.72f } };
-	const FTrack& Track = Playlist[MusicTrackIndex % UE_ARRAY_COUNT(Playlist)];
+	TArray<FTrack, TInlineAllocator<3>> Playlist;
+	if (PuzzleDemo::IsDemo())
+	{
+		// No chant in the demo. The demo tune (/Game/Audio/MUS_Demo) plays in its place, then the organ piece, and round again.
+		if (USoundBase* Tune = DemoMusic.LoadSynchronous())
+		{
+			const float Length = Tune->GetDuration();
+			Playlist.Add({ Tune, (Length > 5.f && Length < 3600.f) ? Length : 120.f, 1.f });
+		}
+		Playlist.Add({ OrganMusicSound, 64.f, 0.72f });
+	}
+	else
+	{
+		Playlist.Add({ MusicSound, 106.f * 2.f, 1.f });
+		Playlist.Add({ OrganMusicSound, 64.f, 0.72f });
+	}
+	const FTrack& Track = Playlist[MusicTrackIndex % Playlist.Num()];
 	++MusicTrackIndex;
+	UE_LOG(LogTemp, Display, TEXT("Music: %s for %.0f s"), *GetNameSafe(Track.Sound), Track.Seconds);
 	if (!Track.Sound)
 	{
 		return;
@@ -648,7 +731,7 @@ void APuzzleGameMode::StartDemo()
 
 void APuzzleGameMode::SetCourse(int32 Width, int32 Height)
 {
-	if (!GridManager)
+	if (PuzzleDemo::IsDemo() || !GridManager)
 	{
 		return;
 	}
@@ -718,9 +801,70 @@ void APuzzleGameMode::HandlePiecePlaced()
 	});
 }
 
+void APuzzleGameMode::SyncDemoBest()
+{
+	if (PuzzleDemo::IsDemo() && SaveGame)
+	{
+		(PuzzleDemo::Mode() == 1 ? SaveGame->DemoBest1 : SaveGame->DemoBest2) = SaveGame->BestScore;
+	}
+}
+
+void APuzzleGameMode::StartDemoGame(int32 Mode)
+{
+	if (!PuzzleDemo::IsDemo() || !GridManager || !PuzzleManager)
+	{
+		return;
+	}
+	SyncDemoBest(); // the best of the mode we leave
+	PuzzleDemo::GMode = (Mode == 1) ? 1 : 2;
+	if (SaveGame)
+	{
+		SaveGame->BestScore = PuzzleDemo::Mode() == 1 ? SaveGame->DemoBest1 : SaveGame->DemoBest2;
+		SaveGame->Save();
+	}
+	PuzzleManager->SetExtrasEnabled(true);
+	PuzzleManager->SetBonusTilesEnabled(PuzzleDemo::BonusTiles());
+	GridManager->SetGridSize(PuzzleDemo::BoardSize(), PuzzleDemo::BoardSize());
+	ReframeCamera();
+	StartEndless();
+}
+
+void APuzzleGameMode::CheckDemoCap()
+{
+	if (!PuzzleDemo::IsDemo() || bArcade || (bAutoPlayEnabled && !PuzzleDemo::IsCapTest()) || bGameOver || !PuzzleManager || PuzzleManager->Score < PuzzleDemo::ScoreCap())
+	{
+		return;
+	}
+	UE_LOG(LogTemp, Display, TEXT("Demo cap reached: score %d, %.1f s into the round"), PuzzleManager->Score, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f);
+	// The round ends here, once the last clear has played out: no more moves, the demo-complete card, a fanfare.
+	bGameOver = true;
+	Flow = EPuzzleFlow::Finished;
+	if (InputHandler)
+	{
+		InputHandler->CancelInteraction();
+	}
+	bLastNewBest = false;
+	if (SaveGame && PuzzleManager->Score > SaveGame->BestScore)
+	{
+		SaveGame->BestScore = PuzzleManager->Score;
+		SyncDemoBest();
+		bLastNewBest = true;
+		SaveGame->Save();
+	}
+	Later(AGridManager::ArriveDuration + 1.6f, [this]()
+	{
+		PlaySfx(RelicSound);
+		if (UPuzzleHUDWidget* UI = GetUI())
+		{
+			UI->ShowCard(EPuzzleCard::DemoDone);
+		}
+	});
+}
+
 void APuzzleGameMode::HandleCleared(const FPuzzleClearEvent& Event)
 {
 	CheckArcadeWin();
+	CheckDemoCap();
 	const float Delay = Event.bHolyLight ? 0.1f : AGridManager::ArriveDuration + 0.1f;
 	Later(Delay, [this, Event]()
 	{
@@ -814,6 +958,7 @@ void APuzzleGameMode::HandleFinished()
 	if (SaveGame && !bArcade && !bAutoPlayEnabled && PuzzleManager && PuzzleManager->Score > SaveGame->BestScore)
 	{
 		SaveGame->BestScore = PuzzleManager->Score;
+		SyncDemoBest();
 		bLastNewBest = true;
 		SaveGame->Save();
 	}

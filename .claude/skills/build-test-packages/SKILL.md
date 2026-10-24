@@ -18,6 +18,10 @@ Before you start
   not trust an existing `JAVA_HOME`: an old Java 8 there makes the Gradle APK step fail ("This build uses a Java 8 JVM").
 
 Known traps
+- A fresh Windows PC refuses to run `.ps1` files ("running scripts is disabled on this system"), and the script then stops in its first
+  second. Run it as `powershell -ExecutionPolicy Bypass -File Tools\build_packages.ps1 ...` (one run only), or let the user allow scripts
+  for their own account (`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`); do not change the policy without asking. Windows build
+  measured on a 12-core, 16 GB PC: compile 8 min, cook and package 15 min, zip 1 min.
 - The Android cook sometimes ends with an engine ensure ("MTAccessDetector") after printing "Done!" and exits 25: it is the engine,
   not the code. The script retries; if both attempts fail, run it again.
 - `Compress-Archive` writes backslash paths that other extractors reject; always zip with `Tools/package_windows.py`.

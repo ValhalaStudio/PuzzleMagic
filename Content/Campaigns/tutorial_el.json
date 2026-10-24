@@ -1,0 +1,266 @@
+{
+  "format": 1,
+  "kind": "tutorial_el",
+  "name": "Tutorial",
+  "finale": "Αυτά είναι όλα. Ώρα να παίξεις το πραγματικό παιχνίδι!",
+  "steps": [
+    {
+      "title": "Your first route",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        4,
+        4
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Ενα Μονοπάτι είναι μια αλυσίδα από πλακίδια, το καθένα να δείχνει προς το επόμενο, που τρέχει από τη μία πλευρά του ταμπλό στην απέναντι. Σύρε το κομμάτι σε οποιαδήποτε γραμμή: όλα του τα πλακίδια δείχνουν δεξιά, οπότε γεμίζει τη γραμμή από την αριστερή άκρη ως τη δεξιά.",
+      "outro": "Αυτο ειναι ενα μονοπάτι! Ολόκληρη η αλυσίδα διαλύεται και σκοράρει.",
+      "hint": "Σύρε το κομμάτι πάνω στο ταμπλό.",
+      "board": [],
+      "tray": {
+        "after": "end",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ],
+                [
+                  3,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "purple"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Finish the chain",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        5,
+        5
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Δύο πλακίδια υπάρχουν ήδη στο ταμπλό και δείχνουν δεξιά από την αριστερή άκρη. Ολοκλήρωσε την αλυσίδα ώστε να φτάσει στη δεξιά άκρη.",
+      "outro": "Μια αλυσίδα πρέπει να ΞΕΚΙΝΑ από ένα πλακίδιο στην άκρη που δείχνει μακριά από αυτήν, και να ΤΕΛΕΙΩΝΕΙ σε ένα πλακίδιο στην απέναντι άκρη που δείχνει ευθεία προς τα έξω.",
+      "hint": "Γέμισε την υπόλοιπη γραμμή.",
+      "board": [
+        {
+          "x": 0,
+          "y": 2,
+          "color": "red",
+          "dir": "right"
+        },
+        {
+          "x": 1,
+          "y": 2,
+          "color": "red",
+          "dir": "right"
+        }
+      ],
+      "tray": {
+        "after": "random",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "black"
+            }
+          ],
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ],
+                [
+                  2,
+                  0
+                ]
+              ],
+              "dirs": [
+                "right",
+                "right",
+                "right"
+              ],
+              "color": "black"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Turning a corner",
+      "goal": 0,
+      "goalRoutes": 1,
+      "timeLimit": 0,
+      "grid": [
+        4,
+        4
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Τα μονοπάτια μπορούν να στρίβουν. Αυτή η αλυσίδα πάει δεξιά, μετά πάνω, και βγαίνει από την πάνω άκρη. Το κομμάτι δείχνει πάνω: τοποθέτησέ το εκεί που ολοκληρώνει την αλυσίδα.",
+      "outro": "Τα μονοπατια μπορούν επίσης να βγαίνουν από μια πλευρά δίπλα σε εκείνη απ' όπου ξεκίνησαν.",
+      "hint": "Ολοκλήρωσε την αλυσίδα στην πάνω άκρη.",
+      "board": [
+        {
+          "x": 0,
+          "y": 1,
+          "color": "purple",
+          "dir": "right"
+        },
+        {
+          "x": 1,
+          "y": 1,
+          "color": "purple",
+          "dir": "right"
+        },
+        {
+          "x": 2,
+          "y": 1,
+          "color": "purple",
+          "dir": "up"
+        }
+      ],
+      "tray": {
+        "after": "random",
+        "buckets": [
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "dirs": [
+                "up",
+                "up"
+              ],
+              "color": "red"
+            }
+          ],
+          [
+            {
+              "cells": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "dirs": [
+                "up",
+                "up"
+              ],
+              "color": "red"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "title": "Now with a clock",
+      "goal": 60,
+      "goalRoutes": 0,
+      "timeLimit": 60,
+      "grid": [
+        5,
+        5
+      ],
+      "relics": {
+        "holyLight": false,
+        "reroll": false
+      },
+      "bonus": {
+        "pumpkin": false,
+        "fullPotion": false,
+        "emptyPotion": false
+      },
+      "intro": "Τώρα παίξε ελεύθερα. Χτίσε μονοπάτια και φτάσε τους 60 πόντους πριν τελειώσει ο χρόνος.",
+      "outro": "Είσαι έτοιμος για το arcade.",
+      "hint": "Χτίσε μονοπάτια οποιουδήποτε μήκους.",
+      "board": [],
+      "tray": {
+        "after": "random",
+        "buckets": []
+      }
+    }
+  ]
+}
